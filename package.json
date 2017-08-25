@@ -1,0 +1,22 @@
+{
+  "name": "python-in-ohm",
+  "version": "1.0.0",
+  "description": "a python parser wirtten using ohm-js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sakekasi/python-in-ohm.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sakekasi/python-in-ohm/issues"
+  },
+  "homepage": "https://github.com/sakekasi/python-in-ohm#readme",
+  "dependencies": {
+    "ohm-js": "^0.13.1"
+  }
+}
