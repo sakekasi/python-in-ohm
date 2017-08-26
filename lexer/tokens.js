@@ -83,7 +83,7 @@ class Delimiter extends Token {
     case ']':
     case '}':
       const matchingOpen = state.parenStack.pop();
-      if (!(matchingOpen && matches(matchingOpen, value))) { // TODO
+      if (!(matchingOpen && matches(matchingOpen, value))) {
         throw new Error('parens dont match');
       }
       break;
