@@ -17,6 +17,10 @@
   },
   "homepage": "https://github.com/sakekasi/python-in-ohm#readme",
   "dependencies": {
-    "ohm-js": "^0.13.1"
+    "ohm-js": "^0.13.1",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {
+    "lex": "^1.7.9"
   }
 }
