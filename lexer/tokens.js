@@ -42,11 +42,7 @@ class Literal extends Token {
 }
 
 class StringLiteral extends Literal {
-  constructor(value) { 
-    super(); 
-    this.value = value;
-  }
-
+  constructor(value) { super(value); }
   static create(state, value) { return new StringLiteral(value); }
 }
 
@@ -64,6 +60,28 @@ const doubleQuoteLongString = `"""${longStringChar}*"""`;
 const longString = `(${singleQuoteLongString}|${doubleQuoteLongString})`;
 
 StringLiteral.regex = new RegExp(`${prefix}?(${longString}|${shortString})`, 'u');
+
+class BytesLiteral extends Literal {
+  constructor(value) { super(value); }
+  static create(state, value) { return new BytesLiteral(value); }
+}
+
+const bytesPrefix = `(b|B|br|Br|bR|BR|rb|rB|Rb|RB)`
+BytesLiteral.regex = new RegExp(`${bytesPrefix}(${longString}|${shortString})`);
+
+class IntegerLiteral extends Literal {
+  constructor(value) { super(value); }
+  static create(state, value) { return new IntegerLiteral(value); }
+}
+
+IntegerLiteral.regex = /[1-9](_?[0-9])*|0(b|B)(_?[01])+|0(o|O)(_?[0-7])+|0(x|X)(_?[0-9a-fA-F])+|0+(_?0)*/u
+
+class FloatingPointLiteral extends Literal {
+  constructor(value) { super(value); }
+  static create(state, value) { return new FloatingPointLiteral(value); }
+}
+
+FloatingPointLiteral.regex = /((([0-9](_?[0-9])*)?\.([0-9](_?[0-9])*)|[0-9](_?[0-9])*\.)|[0-9](_?[0-9])*)((e|E)[+-]?[0-9](_?[0-9])*)?[jJ]?/u;
 
 class Delimiter extends Token {
   constructor(value) { 
@@ -103,6 +121,14 @@ function matches(open, close) {
 
 Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=|\|=|\^=|>>=|<<=|\*\*=|@/u;
 
+const ExplicitLineJoin = {};
+ExplicitLineJoin.create = (state, value) => {}
+ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
+
+const Comment = {};
+Comment.create = (state, value) => {};
+Comment.regex = /#.*(?=(\n|$))/u;
+
 const WhiteSpace = {};
 WhiteSpace.create = (state, value) => {};
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
@@ -124,23 +150,32 @@ class Dedent extends Token {
 class NewLine extends Token {
   constructor() { super(); }
 
-  static create(state, _, spaces) {
-    if (state.parenStack.length > 0 || state.explicitLineJoin) {
+  static create(state, _, currentIndentation) {
+    if (state.parenStack.length > 0) {
       // nop
     } else {
       const ans = [new NewLine()];
-      const currentIndentationLevel = spaces.length;
-      const lastIndentationLevel = state.indentationStack[state.indentationStack.length - 1];
+      const currentIndentationLevel = currentIndentation.length;
+      let lastIndentation = state.indentationStack.join('');
+      let lastIndentationLevel = lastIndentation.length;
       if (currentIndentationLevel === lastIndentationLevel) {
-        // nop
-      } else if (currentIndentationLevel > lastIndentationLevel) {
-        state.indentationStack.push(currentIndentationLevel);
-        ans.push(new Indent(currentIndentationLevel)); // TODO
-      } else {
-        while (state.indentationStack[state.indentationStack.length - 1] > currentIndentationLevel) {
-          ans.push(new Dedent(state.indentationStack.pop()));
+        if (currentIndentation !== lastIndentation) {
+          throw new Error('indentation error');
         }
-        if (state.indentationStack[state.indentationStack.length - 1] !== currentIndentationLevel) {
+      } else if (currentIndentationLevel > lastIndentationLevel) {
+        if (currentIndentation.slice(0, lastIndentationLevel) !== lastIndentation) {
+          throw new Error('indentation error');
+        }
+        state.indentationStack.push(currentIndentation.slice(lastIndentationLevel));
+        ans.push(new Indent(currentIndentationLevel));
+      } else {
+        while (lastIndentationLevel > currentIndentationLevel) {
+          state.indentationStack.pop();
+          ans.push(new Dedent(lastIndentationLevel));
+          lastIndentation = state.indentationStack.join('');
+          lastIndentationLevel = lastIndentation.length;
+        }
+        if (lastIndentationLevel !== currentIndentationLevel || lastIndentation !== currentIndentation) {
           throw new Error('indentation error');
         }
       }
@@ -150,13 +185,18 @@ class NewLine extends Token {
   }
 }
 
-NewLine.regex = /\n([ ]*)/u; // TODO: deal with tabs and nbsps
+NewLine.regex = /\n([ \t\u00A0]*)(?!\n)/u; // TODO: update to match whitespace
+
+const BlankLine = {};
+BlankLine.create = (state, _) => new NewLine();
+BlankLine.regex = /\n([ \t\u00A0]*)(?=\n)/u;
 
 const EOF = {};
 EOF.create = (state) => {
   const ans = [];
   while (state.indentationStack.length > 1) {
-    ans.push(new Dedent(state.indentationStack.pop()));
+    ans.push(new Dedent(state.indentationStack.join('').length));
+    state.indentationStack.pop();
   }
   return ans;
 }
