@@ -111,7 +111,7 @@ Comment.regex = /#.*(?=(\n|$))/u;
 
 class WhiteSpace extends Token {
   static create(state, value) {
-    return new WhiteSpace(value);
+    // return new WhiteSpace(value);
   }
 }
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
