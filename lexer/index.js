@@ -2,7 +2,8 @@ const lexer = new Lexer();
 
 const state = {
   parenStack: [],
-  indentationStack: ['']
+  indentationStack: [''],
+  idx: 0
 };
 
 lexer.addRule(NewLine.regex, _.partial(NewLine.create, state));
@@ -204,7 +205,7 @@ tests.forEach(test => {
   let token;
   while(token = lexer.lex()) {
     console.log(token);
-    prettyPrint += token.toString();// + ' ';
+    prettyPrint += token.toString() + ' ';
   }
   console.log('\n');
   console.log(prettyPrint);
