@@ -204,7 +204,7 @@ tests.forEach(test => {
   let token;
   while(token = lexer.lex()) {
     console.log(token);
-    prettyPrint += token.toString() + ' ';
+    prettyPrint += token.toString();// + ' ';
   }
   console.log('\n');
   console.log(prettyPrint);

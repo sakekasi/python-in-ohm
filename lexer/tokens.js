@@ -96,17 +96,23 @@ function matches(open, close) {
 Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=|\|=|\^=|>>=|<<=|\*\*=|@/u;
 
 class ExplicitLineJoin extends Token {
-  static create(state, value) {}
+  static create(state, value) {
+    return new ExplicitLineJoin(value);
+  }
 }
 ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
 
 class Comment extends Token {
-  static create(state, value) {}
+  static create(state, value) {
+    return new Comment(value);
+  }
 }
 Comment.regex = /#.*(?=(\n|$))/u;
 
 class WhiteSpace extends Token {
-  static create(state, value) {}
+  static create(state, value) {
+    return new WhiteSpace(value);
+  }
 }
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
 
