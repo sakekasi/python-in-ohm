@@ -199,12 +199,15 @@ class EventRecorder(object):
 
 tests.forEach(test => {
   console.log(test);
+  let prettyPrint = '';
   lexer.setInput(test);
   let token;
   while(token = lexer.lex()) {
     console.log(token);
+    prettyPrint += token.toString() + ' ';
   }
   console.log('\n');
+  console.log(prettyPrint);
 })
 
 window.lexer = lexer;

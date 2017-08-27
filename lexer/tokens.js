@@ -1,48 +1,31 @@
 class Token {
+  constructor(value) {
+    this.value = value;
+  }
+
+  toString() {
+    return this.value;
+  }
 }
 
 class Identifier extends Token {
-  constructor(name) {
-    super();
-    this.name = name;
-  }
-
   static create(state, name) { return new Identifier(name); }
 }
-
 Identifier.regex = /[_a-zA-Z][_a-zA-Z0-9]*/u;
 
 class Keyword extends Token {
-  constructor(kw) {
-    super();
-    this.kw = keyword;
-  }
-
   static create(state, kw) { return new Keyword(kw); }
 }
-
 Keyword.regex = /False|None|True|and|as|assert|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield/u;
 
 class Operator extends Token {
-  constructor(op) {
-    super();
-    this.op = op;
-  }
-
   static create(state, op) { return new Operator(op); }
 }
-
 Operator.regex = /\+|-|\*\*|\*|\/\/|\/|%|@|<<|>>|&|\||\^|~|<|>|<=|>=|==|!=/u
 
-class Literal extends Token {
-  constructor(value) {
-    super();
-    this.value = value;
-  }
-}
+class Literal extends Token {}
 
 class StringLiteral extends Literal {
-  constructor(value) { super(value); }
   static create(state, value) { return new StringLiteral(value); }
 }
 
@@ -62,7 +45,6 @@ const longString = `(${singleQuoteLongString}|${doubleQuoteLongString})`;
 StringLiteral.regex = new RegExp(`${prefix}?(${longString}|${shortString})`, 'u');
 
 class BytesLiteral extends Literal {
-  constructor(value) { super(value); }
   static create(state, value) { return new BytesLiteral(value); }
 }
 
@@ -70,25 +52,17 @@ const bytesPrefix = `(b|B|br|Br|bR|BR|rb|rB|Rb|RB)`
 BytesLiteral.regex = new RegExp(`${bytesPrefix}(${longString}|${shortString})`);
 
 class IntegerLiteral extends Literal {
-  constructor(value) { super(value); }
   static create(state, value) { return new IntegerLiteral(value); }
 }
-
 IntegerLiteral.regex = /[1-9](_?[0-9])*|0(b|B)(_?[01])+|0(o|O)(_?[0-7])+|0(x|X)(_?[0-9a-fA-F])+|0+(_?0)*/u
 
 class FloatingPointLiteral extends Literal {
-  constructor(value) { super(value); }
   static create(state, value) { return new FloatingPointLiteral(value); }
 }
 
 FloatingPointLiteral.regex = /((([0-9](_?[0-9])*)?\.([0-9](_?[0-9])*)|[0-9](_?[0-9])*\.)|[0-9](_?[0-9])*)((e|E)[+-]?[0-9](_?[0-9])*)?[jJ]?/u;
 
 class Delimiter extends Token {
-  constructor(value) { 
-    super(); 
-    this.value = value;
-  }
-  
   static create(state, value) {
     switch (value) {
     case '(':
@@ -121,34 +95,41 @@ function matches(open, close) {
 
 Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=|\|=|\^=|>>=|<<=|\*\*=|@/u;
 
-const ExplicitLineJoin = {};
-ExplicitLineJoin.create = (state, value) => {}
+class ExplicitLineJoin extends Token {
+  static create(state, value) {}
+}
 ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
 
-const Comment = {};
-Comment.create = (state, value) => {};
+class Comment extends Token {
+  static create(state, value) {}
+}
 Comment.regex = /#.*(?=(\n|$))/u;
 
-const WhiteSpace = {};
-WhiteSpace.create = (state, value) => {};
+class WhiteSpace extends Token {
+  static create(state, value) {}
+}
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
 
 class Indent extends Token {
   constructor(indentationLevel) {
-    super();
+    super(null);
     this.indentationLevel = indentationLevel;
   }
+
+  toString() { return '⇨'; }
 }
 
 class Dedent extends Token {
   constructor(indentationLevel) {
-    super();
+    super(null);
     this.indentationLevel = indentationLevel;
   }
+
+  toString() { return '⇦'; }
 }
 
 class NewLine extends Token {
-  constructor() { super(); }
+  constructor() { super('\n'); }
 
   static create(state, _, currentIndentation) {
     if (state.parenStack.length > 0) {
@@ -184,20 +165,23 @@ class NewLine extends Token {
     }
   }
 }
-
 NewLine.regex = /\n([ \t\u00A0]*)(?!\n)/u; // TODO: update to match whitespace
 
-const BlankLine = {};
-BlankLine.create = (state, _) => new NewLine();
+class BlankLine extends Token {
+  static create(state) {
+    return new NewLine();
+  }
+}
 BlankLine.regex = /\n([ \t\u00A0]*)(?=\n)/u;
 
-const EOF = {};
-EOF.create = (state) => {
-  const ans = [];
-  while (state.indentationStack.length > 1) {
-    ans.push(new Dedent(state.indentationStack.join('').length));
-    state.indentationStack.pop();
+class EOF extends Token{
+  static create(state) {
+    const ans = [];
+    while (state.indentationStack.length > 1) {
+      ans.push(new Dedent(state.indentationStack.join('').length));
+      state.indentationStack.pop();
+    }
+    return ans;
   }
-  return ans;
 }
 EOF.regex = /$/u
