@@ -124,7 +124,7 @@ Python {
     | Test? ":" Test? Sliceop? -- slice
   Sliceop = ":" Test?
   Argument = Test Comp_for? -- positional
-    | Test "=" Test -- keyword
+    | identifier "=" Test -- keyword
     | "*" Test -- single_star
     | "**" Test -- double_star
   

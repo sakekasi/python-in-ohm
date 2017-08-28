@@ -1,5 +1,11 @@
 const tests = [
   {
+    code: `def f(a = 5):
+⇨ return a
+⇦`,
+    rule: 'Program'
+  },
+  {
     code: `import json 
 import time 
 from events import * 
