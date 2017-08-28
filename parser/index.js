@@ -1,25 +1,5 @@
 const tests = [
   {
-    code: `import time 
-from events import * 
-from Env import Env , Scope 
-from utils import toJSON 
-import pickle 
-class EventRecorder ( object ) : 
-⇨ def __init__ ( self , queue ) : 
-⇨ self . currentProgramOrSendEvent = None 
-self . queue = queue 
-self . raised = False 
-⇦ def program ( self , orderNum , sourceLoc ) : 
-⇨ event = ProgramEvent ( orderNum , sourceLoc ) 
-self . currentProgramOrSendEvent = event 
-self . _emit ( event ) 
-env = self . mkEnv ( sourceLoc , None , None , 'program' , [ ] ) 
-return env 
-⇦ ⇦`,
-    rule: 'Program'
-  },
-  {
     code: `import json 
 import time 
 from events import * 
