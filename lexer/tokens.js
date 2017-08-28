@@ -120,9 +120,9 @@ Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=
 
 class ExplicitLineJoin extends Token {
   static create(state, value) {
-    const ans = new ExplicitLineJoin(value, state.idx, state.idx + 1);
+    // const ans = new ExplicitLineJoin(value, state.idx, state.idx + 1);
     state.idx += value.length;
-    return ans;
+    // return ans;
   }
 }
 ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
@@ -203,16 +203,16 @@ NewLine.regex = /\n([ \t\u00A0]*)(?!\n)/u; // TODO: update to match whitespace
 
 class BlankLine extends Token {
   static create(state, blankLine) {
-    const ans = new NewLine(state.idx, state.idx + 1);
+    // const ans = new NewLine(state.idx, state.idx + 1);
     state.idx += blankLine.length;
-    return ans;
+    // return ans;
   }
 }
-BlankLine.regex = /\n([ \t\u00A0]*)(?=\n)/u;
+BlankLine.regex = /\n([ \t\u00A0]*)(#.*(?=(\n|$)))?(?=\n)/u;
 
 class EOF extends Token{
   static create(state) {
-    const ans = [];
+    const ans = [new NewLine(state.idx, state.idx)];
     while (state.indentationStack.length > 1) {
       ans.push(new Dedent(state.indentationStack.join('').length, state.idx, state.idx));
       state.indentationStack.pop();

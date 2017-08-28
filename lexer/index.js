@@ -175,8 +175,11 @@ class EventRecorder(object):
 
   def done(self):
     self.queue.put(pickle.dumps({'type': 'done'}))`,
-// `a = 5 \\
-//       + 7`,
+`a = 5 \\
+      + 7`,
+`def __init__(self, x, y):
+  self.x = x
+  self.y = y`
 // `a = (5 # the first thing
 //       ,7) # the second thing`,
 // `if foo:
