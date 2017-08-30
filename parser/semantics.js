@@ -1,0 +1,1 @@
+const semantics = pythonGrammar.createSemantics();

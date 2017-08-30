@@ -1,7 +1,7 @@
 class Token {
   constructor(value, startIdx, endIdx) {
     this.value = value;
-    this.startIdx = startIdx;
+    this.startIdx = startIdx; // where the token starts in the original string
     this.endIdx = endIdx;
   }
 
@@ -10,30 +10,23 @@ class Token {
   }
 }
 
-function getBounds(state, name) {
-  const startIdx = state.idx;
-  state.idx += name.length;
-  const endIdx = state.idx;
-  return [startIdx, endIdx]
-}
-
-class Identifier extends Token {
+class IdentifierT extends Token {
   static create(state, name) {
-    return new Identifier(name, ...getBounds(state, name)); 
+    return new IdentifierT(name, ...state.getRange(name)); 
   }
 }
-Identifier.regex = /[_a-zA-Z][_a-zA-Z0-9]*/u;
+IdentifierT.regex = /[_a-zA-Z][_a-zA-Z0-9]*/u;
 
-class Keyword extends Token {
+class KeywordT extends Token {
   static create(state, kw) { 
-    return new Keyword(kw, ...getBounds(state, kw));
+    return new KeywordT(kw, ...state.getRange(kw));
   }
 }
-Keyword.regex = /False|None|True|and|as|assert|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield/u;
+KeywordT.regex = /False|None|True|and|as|assert|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield/u;
 
 class Operator extends Token {
   static create(state, op) { 
-    return new Operator(op, ...getBounds(state, op));
+    return new Operator(op, ...state.getRange(op));
   }
 }
 Operator.regex = /\+|-|\*\*|\*|\/\/|\/|%|@|<<|>>|&|\||\^|~|<|>|<=|>=|==|!=/u
@@ -42,7 +35,7 @@ class Literal extends Token {}
 
 class StringLiteral extends Literal {
   static create(state, value) {
-    return new StringLiteral(value, ...getBounds(state, value));
+    return new StringLiteral(value, ...state.getRange(value));
   }
 }
 
@@ -63,7 +56,7 @@ StringLiteral.regex = new RegExp(`${prefix}?(${longString}|${shortString})`, 'u'
 
 class BytesLiteral extends Literal {
   static create(state, value) {
-    return new BytesLiteral(value, ...getBounds(state, value));
+    return new BytesLiteral(value, ...state.getRange(value));
   }
 }
 
@@ -72,14 +65,14 @@ BytesLiteral.regex = new RegExp(`${bytesPrefix}(${longString}|${shortString})`);
 
 class IntegerLiteral extends Literal {
   static create(state, value) {
-    return new IntegerLiteral(value, ...getBounds(state, value));
+    return new IntegerLiteral(value, ...state.getRange(value));
   }
 }
 IntegerLiteral.regex = /[1-9](_?[0-9])*|0(b|B)(_?[01])+|0(o|O)(_?[0-7])+|0(x|X)(_?[0-9a-fA-F])+|0+(_?0)*/u
 
 class FloatingPointLiteral extends Literal {
   static create(state, value) {
-    return new FloatingPointLiteral(value, ...getBounds(state, value));
+    return new FloatingPointLiteral(value, ...state.getRange(value));
   }
 }
 
@@ -103,7 +96,7 @@ class Delimiter extends Token {
       }
       break;
     }
-    return new Delimiter(value, ...getBounds(state, value)); 
+    return new Delimiter(value, ...state.getRange(value)); 
   }
 }
 
@@ -120,8 +113,8 @@ Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=
 
 class ExplicitLineJoin extends Token {
   static create(state, value) {
-    // const ans = new ExplicitLineJoin(value, state.idx, state.idx + 1);
-    state.idx += value.length;
+    // const ans = new ExplicitLineJoin(value, state.origIdx, state.origIdx + 1);
+    state.origIdx += value.length;
     // return ans;
   }
 }
@@ -129,16 +122,15 @@ ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
 
 class Comment extends Token {
   static create(state, value) {
-    // return new Comment(value, ...getBounds(state, name));
-    state.idx += name.length;
+    // return new Comment(value, ...state.getRange(name));
+    state.origIdx += name.length;
   }
 }
 Comment.regex = /#.*(?=(\n|$))/u;
 
 class WhiteSpace extends Token {
   static create(state, value) {
-    state.idx += value.length;
-    // return new WhiteSpace(value);
+    state.origIdx += value.length;
   }
 }
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
@@ -168,7 +160,7 @@ class NewLine extends Token {
     if (state.parenStack.length > 0) {
       // nop
     } else {
-      const ans = [new NewLine(state.idx, ++state.idx)];
+      const ans = [new NewLine(state.origIdx, ++state.origIdx)];
       const currentIndentationLevel = currentIndentation.length;
       let lastIndentation = state.indentationStack.join('');
       let lastIndentationLevel = lastIndentation.length;
@@ -181,18 +173,19 @@ class NewLine extends Token {
           throw new Error('indentation error');
         }
         state.indentationStack.push(currentIndentation.slice(lastIndentationLevel));
-        ans.push(new Indent(currentIndentationLevel, ...getBounds(state, currentIndentation)));
+        ans.push(new Indent(currentIndentationLevel, state.origIdx, state.origIdx + 1));
+        state.getRange(currentIndentation);
       } else {
         while (lastIndentationLevel > currentIndentationLevel) {
           state.indentationStack.pop();
-          ans.push(new Dedent(lastIndentationLevel, state.idx, state.idx));
+          ans.push(new Dedent(lastIndentationLevel, state.origIdx, state.origIdx));
           lastIndentation = state.indentationStack.join('');
           lastIndentationLevel = lastIndentation.length;
         }
         if (lastIndentationLevel !== currentIndentationLevel || lastIndentation !== currentIndentation) {
           throw new Error('indentation error');
         }
-        state.idx += currentIndentation.length;
+        state.origIdx += currentIndentation.length;
       }
       state.explicitLineJoin = false;
       return ans;
@@ -203,18 +196,16 @@ NewLine.regex = /\n([ \t\u00A0]*)(?!\n)/u; // TODO: update to match whitespace
 
 class BlankLine extends Token {
   static create(state, blankLine) {
-    // const ans = new NewLine(state.idx, state.idx + 1);
-    state.idx += blankLine.length;
-    // return ans;
+    state.origIdx += blankLine.length;
   }
 }
 BlankLine.regex = /\n([ \t\u00A0]*)(#.*(?=(\n|$)))?(?=\n)/u;
 
 class EOF extends Token{
   static create(state) {
-    const ans = [new NewLine(state.idx, state.idx)];
+    const ans = [new NewLine(state.origIdx, state.origIdx)];
     while (state.indentationStack.length > 1) {
-      ans.push(new Dedent(state.indentationStack.join('').length, state.idx, state.idx));
+      ans.push(new Dedent(state.indentationStack.join('').length, state.origIdx, state.origIdx));
       state.indentationStack.pop();
     }
     return ans;

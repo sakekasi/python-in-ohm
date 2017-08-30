@@ -118,7 +118,7 @@ Python {
     | ("," (Test | Star_expr))* ","? -- lit
   
   Trailer = "(" Arglist? ")" -- call
-    | "[" Subscriptlist? "]" -- subscript
+    | "[" Subscriptlist "]" -- subscript
     | "." identifier -- attribute
   Subscript = Test -- single
     | Test? ":" Test? Sliceop? -- slice
