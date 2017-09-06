@@ -25,4 +25,11 @@ class SourceLoc {
     const endIdx = this.endIdx > other.endIdx ? this.endIdx : other.endIdx;
     return new SourceLoc(startIdx, endIdx);
   }
+
+  toAST() {
+    return dict(
+      str('startIdx'), this.startIdx,
+      str('endIdx'), this.endIdx
+    );
+  }
 }

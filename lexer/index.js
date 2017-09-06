@@ -41,7 +41,7 @@ class Preprocessor {
       if (!(token instanceof NewLine)) {
         this.state.newIdx++;
       }
-
+      
       this.state.preprocessedCode += tokenString;
       if (token.startIdx === token.endIdx) {
         this.state.sourceMap.mapSingle(token.startIdx, newStartIdx, newEndIdx);
@@ -59,7 +59,7 @@ class Preprocessor {
     // the position just after the end of the original text
     this.state.sourceMap.mapSingle(code.length, 
         this.state.preprocessedCode.length, this.state.preprocessedCode.length + 1);
-
+        
     return {
       code: this.state.preprocessedCode,
       map: this.state.sourceMap

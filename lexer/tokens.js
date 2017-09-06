@@ -114,7 +114,7 @@ Delimiter.regex = /\(|\)|\[|\]|\{|\}|,|:|\.|;|=|->|\+=|-=|\*=|\/=|\/\/=|%=|@=|&=
 class ExplicitLineJoin extends Token {
   static create(state, value) {
     // const ans = new ExplicitLineJoin(value, state.origIdx, state.origIdx + 1);
-    state.origIdx += value.length;
+    state.getRange(value);
     // return ans;
   }
 }
@@ -123,14 +123,14 @@ ExplicitLineJoin.regex = /\\[ \t\u00A0]*\n/u;
 class Comment extends Token {
   static create(state, value) {
     // return new Comment(value, ...state.getRange(name));
-    state.origIdx += name.length;
+    state.getRange(value);
   }
 }
 Comment.regex = /#.*(?=(\n|$))/u;
 
 class WhiteSpace extends Token {
   static create(state, value) {
-    state.origIdx += value.length;
+    state.getRange(value);
   }
 }
 WhiteSpace.regex = /[ \t\u00A0]+/u; // TODO: update regex to include unicode
@@ -158,7 +158,7 @@ class NewLine extends Token {
 
   static create(state, _, currentIndentation) {
     if (state.parenStack.length > 0) {
-      // nop
+      state.getRange(_);
     } else {
       const ans = [new NewLine(state.origIdx, ++state.origIdx)];
       const currentIndentationLevel = currentIndentation.length;
@@ -173,7 +173,7 @@ class NewLine extends Token {
           throw new Error('indentation error');
         }
         state.indentationStack.push(currentIndentation.slice(lastIndentationLevel));
-        ans.push(new Indent(currentIndentationLevel, state.origIdx, state.origIdx + 1));
+        ans.push(new Indent(currentIndentationLevel, state.origIdx, state.origIdx + 1)); // TODO: this is suspect
         state.getRange(currentIndentation);
       } else {
         while (lastIndentationLevel > currentIndentationLevel) {
@@ -185,7 +185,7 @@ class NewLine extends Token {
         if (lastIndentationLevel !== currentIndentationLevel || lastIndentation !== currentIndentation) {
           throw new Error('indentation error');
         }
-        state.origIdx += currentIndentation.length;
+        state.getRange(currentIndentation);
       }
       state.explicitLineJoin = false;
       return ans;
@@ -196,7 +196,7 @@ NewLine.regex = /\n([ \t\u00A0]*)(?!\n)/u; // TODO: update to match whitespace
 
 class BlankLine extends Token {
   static create(state, blankLine) {
-    state.origIdx += blankLine.length;
+    state.getRange(blankLine);
   }
 }
 BlankLine.regex = /\n([ \t\u00A0]*)(#.*(?=(\n|$)))?(?=\n)/u;

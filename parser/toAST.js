@@ -5,58 +5,54 @@ semantics.addOperation('toAST(sourceMap)', {
       flattenAndFilterNulls(newlinesAndStmts.toAST(sourceMap)));
   },
 
-  Simple_stmt(smallStmts, _, __) {
+  Stmt_simple(stmts, _){
     const sourceMap = this.args.sourceMap;
-    return flattenAndFilterNulls(smallStmts.asIteration().toAST(sourceMap))
+    return stmts.toAST(sourceMap);
   },
 
-  Expr_stmt(left, right) {
+  SimpleStmt_assign(targetListCsts, _, valueCst) {
     const sourceMap = this.args.sourceMap;
-    const target = left.toAST(sourceMap);
-    const rightType = last(right.child(0).ctorName.split('_'));
+    const targets = targetListCsts.toAST(sourceMap)
+      .map((target, idx) => {
+        const targetCst = targetListCsts.child(idx);
+        if (target instanceof Array) {
+          return tupleOrExpr(targetCst.sourceLoc(sourceMap), target);
+        } else {
+          return target;
+        }
+      });
+    const value = valueCst.toAST(sourceMap);
+    return new Assign(this.sourceLoc(sourceMap), targets, value);
+  },
 
-    let ans;
-    switch (rightType) {
-      case 'annassign':
-        break;
-      case 'augassign':
-        break;
-      case 'normal':
-        const rights = right.toAST(sourceMap);
-        const targets = [target, ...rights.slice(0, -1)]
-          .map((target, idx) => {
-            let targetCst;
-            if (idx === 0) {
-              targetCst = left;
-            } else {
-              targetCst = right.child(idx - 1);
-            }
-            if (target instanceof Array) {
-              return tupleOrExpr(targetCst.sourceLoc(sourceMap), target);
-            } else {
-              return target;
-            }
-          });
-        const value = last(rights);
+  // SimpleStmt_annassign() {}, // TODO
+  // SimpleStmt_augassign() {}, // TODO
 
-        ans = new Assign(this.sourceLoc(sourceMap), targets, value);
-        break;
-      default:
-        throw new Error('should never get here ' + rightType);
+  ImportStmt_from(_, moduleCst, __, nameCsts) {
+    const sourceMap = this.args.sourceMap;
+    const [module, level] = moduleCst.toAST(sourceMap);
+    const names = nameCsts.toAST(sourceMap);
+
+    return new ImportFrom(this.sourceLoc(sourceMap), module, names, level);
+  },
+
+  RelativeModule_named(dots, moduleCst) {
+    return [moduleCst.sourceString, dots.numChildren];
+  },
+
+  IdentifierAsName(identCst, _, optName) {
+    const sourceMap = this.args.sourceMap;
+    const name = identCst.sourceString;
+    let asName;
+    if (optName.numChildren > 0) {
+      asName = optName.child(0).sourceString;
+    } else {
+      asName = null;
     }
-    return ans;
+    return new Alias(this.sourceLoc(sourceMap), name, asName);
   },
 
-  // Expr_stmt_part_annassign() {}, // TODO
-  // Expr_stmt_part_augassign() {}, // TODO
-
-  Expr_stmt_part_normal(_, exprCsts) {
-    const sourceMap = this.args.sourceMap;
-    const exprs = exprCsts.toAST(sourceMap);
-    return exprs;
-  }, 
-
-  Compound_stmt_for(_, targetCst, __, iterCst, bodyCst, ___, optElseCst ) {
+  CompoundStmt_for(_, targetCst, __, iterCst, bodyCst, ___, optElseCst ) {
     const sourceMap = this.args.sourceMap;
     const target = tupleOrExpr(targetCst.sourceLoc(sourceMap), targetCst.toAST(sourceMap));
     const iter = tupleOrExpr(iterCst.sourceLoc(sourceMap), iterCst.toAST(sourceMap));
@@ -70,56 +66,70 @@ semantics.addOperation('toAST(sourceMap)', {
     return new For(this.sourceLoc(sourceMap), target, iter, body, orelse);
   },
 
-  Suite_single(_, stmtCst) {
+  Suite_single(_, stmtCst, __) {
     const sourceMap = this.args.sourceMap;
-    return [stmtCst.toAST(sourceMap)];
+    return [flatten(stmtCst.toAST(sourceMap))];
   },
 
   Suite_many(_, __, ___, stmts, ____) {
     const sourceMap = this.args.sourceMap;
-    return flattenAndFilterNulls(stmts.toAST(sourceMap));
+    return flatten(stmts.toAST(sourceMap));
   },
 
-  Test_or(orCst, _, optTest, __, optElse) {
+  ParameterList_normal(defParameters, _, optRest) {
     const sourceMap = this.args.sourceMap;
-    const or = orCst.toAST(sourceMap);
+    const positional = defParameters.asIteration().toAST(sourceMap);
+    const rest = optRest.numChildren === 1 ?
+      optRest.toAST(sourceMap)[0] : {vararg: null, kwonlyargs: [], kwarg: null, defaults: []};
+    
+    return new Arguments(this.sourceLoc(sourceMap), 
+      positional.map(i => i.param), rest.vararg, rest.kwonlyargs, rest.kwarg, 
+      positional.map(i => i.default), rest.defaults);
+  },
+
+  DefParameter(paramCst, _, optDefaultCst) {
+    const sourceMap = this.args.sourceMap;
+    const param = paramCst.toAST(sourceMap); // TODO: parameter
+    const default_ = optDefaultCst.numChildren === 1 ? optDefaultCst.toAST(sourceMap) : null;
+    return {param, default: default_};
+  },
+
+  Expr_cond(leftCst, _, optTest, __, optElse) {
+    const sourceMap = this.args.sourceMap;
+    const left = leftCst.toAST(sourceMap);
     const test = flattenAndFilterNulls(optTest.toAST(sourceMap));
     const else_ = flattenAndFilterNulls(optElse.toAST(sourceMap)); 
 
     if (test.length === 0) {
-      return or;
+      return left;
     } else {
       return new IfExp(this.sourceLoc(sourceMap), or, test[0], else_[0]);
     }
   },
 
-  // Lambdef() {},
-
-  Or_test(leftCst, _, rightCsts) {
+  Expr_lambda(_, optParamCsts, __, bodyCst) {
     const sourceMap = this.args.sourceMap;
-    const left = leftCst.toAST(sourceMap);
-    const rights = flattenAndFilterNulls(rightCsts.toAST(sourceMap));
+    const args = optParamCsts.numChildren === 1 ? optParamCsts.toAST(sourceMap)[0] : [];
+    const body = bodyCst.toAST(sourceMap);
 
-    if (rights.length === 0) {
-      return left;
-    } else {
-      return new BoolOp(this.sourceLoc(sourceMap), 'or', [left].concat(rights));
-    }
+    return new Lambda(this.sourceLoc(sourceMap), args, body);
   },
 
-  And_test(leftCst, _, rightCsts) {
+  OrTest_or(leftCst, _, rightCst) {
     const sourceMap = this.args.sourceMap;
     const left = leftCst.toAST(sourceMap);
-    const rights = flattenAndFilterNulls(rightCsts.toAST(sourceMap));
-
-    if (rights.length === 0) {
-      return left;
-    } else {
-      return new BoolOp(this.sourceLoc(sourceMap), 'and', [left].concat(rights));
-    }
+    const right = rightCst.toAST(sourceMap);
+    return new BoolOp(this.sourceLoc(sourceMap), 'or', [left, right]);
   },
 
-  Not_test_not(_, exprCst) {
+  AndTest_and(leftCst, _, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    const left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BoolOp(this.sourceLoc(sourceMap), 'and', [left, right]);
+  },
+
+  NotTest_not(_, exprCst) {
     const sourceMap = this.args.sourceMap;
     const expr = exprCst.toAST(sourceMap);
     return new UnaryOp(this.sourceLoc(sourceMap), 'not', expr);
@@ -138,103 +148,95 @@ semantics.addOperation('toAST(sourceMap)', {
     }
   },
 
-  Star_expr(_, exprCst) {
+  StarredExpr_star(starredItemList) { // TODO
+    const sourceMap = this.args.sourceMap;
+    const maybeStarredItems = starredItemList.asIteration().toAST(sourceMap);
+    if (maybeStarredItems.length === 1) {
+      return maybeStarredItems[0];
+    } else {
+      throw new Error('TODO: implement multiple starred items');
+    }
+  },
+
+  StarredItem_star(_, exprCst) {
     const sourceMap = this.args.sourceMap;
     const expr = exprCst.toAST(sourceMap);
     return new Starred(this.sourceLoc(sourceMap), expr);
   },
 
-  Expr(leftCst, _, rightCsts) { // bitwise or (left to right associative)
+  OrExpr_or(leftCst, _, rightCst) { // bitwise or (left to right associative)
     const sourceMap = this.args.sourceMap;
-    let left = leftCst.toAST(sourceMap);
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach(right => {
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc), 
-        left, '|', right);
-      left = nextLeft;
-    });
-    return left;
+    const left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '|', right);
   },
 
-  Xor_expr(leftCst, _, rightCsts) { // bitwise xor (left to right associative)
+  XorExpr_xor(leftCst, _, rightCst) { // bitwise xor (left to right associative)
     const sourceMap = this.args.sourceMap;
-    let left = leftCst.toAST(sourceMap);
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach(right => {
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc),
-        left, '^', right);
-      left = nextLeft;
-    });
-    return left;
+    const left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '^', right);
   },
 
-  And_expr(leftCst, _, rightCsts) { // bitwise and (left to right associative)
+  AndExpr_and(leftCst, _, rightCst) { // bitwise and (left to right associative)
     const sourceMap = this.args.sourceMap;
-    let left = leftCst.toAST(sourceMap);
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach(right => {
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc), 
-        left, '&', right);
-      left = nextLeft;
-    });
-    return left;
+    const left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '&', right);
   },
 
-  Shift_expr(leftCst, opCsts, rightCsts) { // shift (left to right associative)
+  ShiftExpr_shift(leftCst, opCst, rightCst) { // shift (left to right associative)
     const sourceMap = this.args.sourceMap;
     let left = leftCst.toAST(sourceMap);
-    let ops = opCsts.toAST(sourceMap); // TODO
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach((right, idx) => {
-      const op = ops[idx];
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc), 
-        left, op, right);
-      left = nextLeft;
-    });
-    return left;
+    let op = opCst.toAST(sourceMap); // TODO
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, op, right);
   },
 
-  Arith_expr(leftCst, opCsts, rightCsts) { // +/- (left to right associative)
+  AddExpr_addSub(leftCst, opCst, rightCst) { // +/- (left to right associative)
     const sourceMap = this.args.sourceMap;
     let left = leftCst.toAST(sourceMap);
-    let ops = opCsts.toAST(sourceMap); // TODO
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach((right, idx) => {
-      const op = ops[idx];
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc), 
-        left, op, right);
-      left = nextLeft;
-    });
-    return left;
+    let op = opCst.toAST(sourceMap); // TODO
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, op, right);
   },
 
-  Term(leftCst, opCsts, rightCsts) { // *, /, %, @, // (left to right associative)
+  MultExpr_mult(leftCst, _, rightCst) { // *, /, %, @, // (left to right associative)
     const sourceMap = this.args.sourceMap;
     let left = leftCst.toAST(sourceMap);
-    let ops = opCsts.toAST(sourceMap); // TODO
-    const rights = rightCsts.toAST(sourceMap);
-
-    rights.forEach((right, idx) => {
-      const op = ops[idx];
-      let nextLeft = new BinOp(
-        left.sourceLoc.join(right.sourceLoc), 
-        left, op, right);
-      left = nextLeft;
-    });
-    return left;
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '*', right);
   },
 
-  Factor_fact(opCst, exprCst) { // unary ops (-, +, ~)
+  MultExpr_matMult(leftCst, _, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    let left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '@', right);
+  },
+
+  MultExpr_intDiv(leftCst, _, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    let left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '//', right);
+  },
+
+  MultExpr_div(leftCst, _, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    let left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '/', right);
+  },
+
+  MultExpr_mod(leftCst, _, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    let left = leftCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return new BinOp(this.sourceLoc(sourceMap), left, '%', right);
+  },
+
+  UnaryExpr_unary(opCst, exprCst) { // unary ops (-, +, ~)
     const sourceMap = this.args.sourceMap;
     let op = opCst.toAST(sourceMap); // TODO
     let expr = exprCst.toAST(sourceMap);
@@ -253,105 +255,79 @@ semantics.addOperation('toAST(sourceMap)', {
     }
   },
 
-  Atom_expr(optAwait, atomCst, trailerCsts) {
+  // Await_expr_await() {}, // TODO
+
+  PrimaryExpr_attributeref(valueCst, _, attrCst) {
     const sourceMap = this.args.sourceMap;
-    let atom = atomCst.toAST(sourceMap);
-    const trailers = trailerCsts.toAST(sourceMap);
-    trailers.forEach((trailer, idx) => {
-      let nextAtom;
-      const trailerCst = trailerCsts.child(idx);
-      switch (trailer.type) {
-        case 'call':
-          nextAtom = new Call(
-            atom.sourceLoc.join(trailerCst.sourceLoc(sourceMap)), 
-            atom, trailer.args, trailer.keywords);
-          break;
-        case 'subscript':
-          nextAtom = new Subscript(
-            atom.sourceLoc.join(trailerCst.sourceLoc(sourceMap)), 
-            trailer.slice);
-          break;
-        case 'attribute':
-          nextAtom = new Attribute(
-            atom.sourceLoc.join(trailerCst.sourceLoc(sourceMap)), 
-            atom, trailer.attr);
-          break;
-        default:
-          throw new Error('should never get here');
-      }
-      atom = nextAtom;
-    });
-    if (optAwait.numChildren > 0) {
-      atom = new Await(this.sourceLoc(sourceMap), atom);
+    const value = valueCst.toAST(sourceMap);
+    const attr = attrCst.toAST(sourceMap);
+    return new Attribute(this.sourceLoc(sourceMap), value, attr);
+  },
+
+  PrimaryExpr_slicing(valueCst, _, sliceCst, __) {
+    const sourceMap = this.args.sourceMap;
+    const value = valueCst.toAST(sourceMap);
+    const slice = sliceCst.toAST(sourceMap);
+    return new Subscript(
+      this.sourceLoc(sourceMap),
+      value, slice);
+  },
+
+  PrimaryExpr_call(funcCst, _, optArgsOrComp, __) {
+    const sourceMap = this.args.sourceMap;
+    const func = funcCst.toAST(sourceMap);
+    const argsOrComp = optArgsOrComp.toAST(sourceMap);
+    if (argsOrComp.length === 0 || argsOrComp[0] instanceof Comprehension) { // TODO: comprehension
+      return new Call(this.sourceLoc(sourceMap), func, argsOrComp, []);
+    } else {
+      const args = argsOrComp[0];
+      return new Call(this.sourceLoc(sourceMap), func, args.positional, args.keyword);
     }
-    return atom;
+  },
+
+  ArgList(positionalArguments, _, optKeywordsArguments, __) {
+    const sourceMap = this.args.sourceMap;
+    const positional = positionalArguments.toAST(sourceMap);
+    let keyword = optKeywordsArguments.toAST(sourceMap);
+    if (keyword.length > 0) {
+      keyword = keyword[0];
+    }
+    return {positional, keyword};
   },
 
   // Atom_tuple() {}, // TODO
 
-  // Atom_list() {}, // TODO
+  Atom_list(_, starredListOrCompCst, __) {
+    const sourceMap = this.args.sourceMap;
+    const starredListOrComp = starredListOrCompCst.numChildren === 1 ?
+      starredListOrCompCst.toAST(sourceMap)[0] : [];
+    
+    if (starredListOrComp instanceof Comprehension) {
+      throw new Error('TODO not implemented yet'); 
+    } else {
+      return new List(this.sourceLoc(sourceMap), starredListOrComp);
+    }
+  },
 
   // Atom_dict() {}, // TODO
 
-  Atom_str(strCsts) {
-    const sourceMap = this.args.sourceMap;
-    const strs = strCsts.toAST(sourceMap);
-    return new JoinedStr(this.sourceLoc(sourceMap), strs);
-  },
+  // Atom_str(strCsts) {
+  //   const sourceMap = this.args.sourceMap;
+  //   const strs = strCsts.toAST(sourceMap);
+  //   return new JoinedStr(this.sourceLoc(sourceMap), strs);
+  // },
 
   Atom_ellipsis(_) {
     return new Ellipsis(this.sourceLoc(sourceMap));
   },
 
-  Trailer_call(_, optArglist, __) {
-    const sourceMap = this.args.sourceMap;
-    let argList = optArglist.toAST(sourceMap);
-    if (argList.length === 0) {
-      return {
-        args: [], keywords: []
-      }
-    } else {
-      argList = argList[0];
-      let handlingKeywords = false;
-      let args = [], keywords = [];
-      argList.forEach(argExpr => {
-        if (argExpr instanceof Keyword) {
-          handlingKeywords = true;
-          keywords.push(argExpr);
-        } else if (argExpr instanceof Expr) {
-          if (handlingKeywords) {
-            throw new Error('positional argument follows keyword argument');
-          }
-          args.push(argExpr);
-        }
-      });
-      return { type: 'call', args, keywords }
-    }
-  }, // TODO
-
-  Trailer_subscript(_, subsriptlistCst, __) {
-    const sourceMap = this.args.sourceMap;
-    const subscriptList = subsriptlistCst.toAST(sourceMap);
-    if (subscriptList.length === 1) {
-      return { type: 'subscript', slice: subscriptList[0] }
-    } else {
-      return { slice: new ExtSlice(this.sourceLoc(sourceMap), subscriptList) }; // TODO
-    }
-  }, // TODO context
-
-  Trailer_attribute(_, attributeCst) {
-    const sourceMap = this.args.sourceMap;
-    const attribute = attributeCst.toAST(sourceMap);
-    return { type: 'attribute', attr: attribute };
-  }, // TODO
-
-  Subscript_single(exprCst) {
+  Slice_single(exprCst) {
     const sourceMap = this.args.sourceMap;
     const expr = exprCst.toAST(sourceMap);
     return new Index(this.sourceLoc(sourceMap), expr); // TODO
   }, // TODO context
 
-  Subscript_slice(optStartCst, _,  optEndCst, optStepCst) {
+  Slice_slice(optStartCst, _,  optEndCst, optStepCst) {
     const sourceMap = this.args.sourceMap;
     const start = optStartCst.toAST(sourceMap);
     const end = optEndCst.toAST(sourceMap);
@@ -374,15 +350,9 @@ semantics.addOperation('toAST(sourceMap)', {
     }
   },
 
-  Argument_positional(exprCst, optCompCst) {
+  Argument_positional(exprCst) {
     const sourceMap = this.args.sourceMap;
-    const expr = exprCst.toAST(sourceMap);
-    const comp = optCompCst.toAST(sourceMap);
-    if (comp.length === 0) {
-      return expr;
-    } else {
-      throw new Error('TODO: implement comprehensions');
-    }
+    return exprCst.toAST(sourceMap);
   }, // TODO context Param
 
   Argument_keyword(argCst,_,  valueCst) {
@@ -392,13 +362,13 @@ semantics.addOperation('toAST(sourceMap)', {
     return new Keyword(this.sourceLoc(sourceMap), arg, value);
   }, // TODO context Param
 
-  Argument_single_star(_, exprCst) {
+  Argument_singleStar(_, exprCst) {
     const sourceMap = this.args.sourceMap;
     const expr = exprCst.toAST(sourceMap);
     return new Starred(this.sourceLoc(sourceMap), expr);
   }, // TODO context Param
 
-  Argument_double_star(_, exprCst) {
+  Argument_doubleStar(_, exprCst) {
     const sourceMap = this.args.sourceMap;
     const expr = exprCst.toAST(sourceMap);
     return new Keyword(this.sourceLoc(sourceMap), null, expr);
@@ -428,7 +398,17 @@ semantics.addOperation('toAST(sourceMap)', {
     return new Identifier(this.sourceLoc(sourceMap), this.sourceString); 
   },
 
-  number(_) {
+  integer(_) {
+    const sourceMap = this.args.sourceMap;
+    return new Num(this.sourceLoc(sourceMap), this.sourceString); 
+  },
+
+  floating_point(_) {
+    const sourceMap = this.args.sourceMap;
+    return new Num(this.sourceLoc(sourceMap), this.sourceString); 
+  },
+
+  imaginary(_, __) {
     const sourceMap = this.args.sourceMap;
     return new Num(this.sourceLoc(sourceMap), this.sourceString); 
   },
@@ -451,6 +431,11 @@ semantics.addOperation('toAST(sourceMap)', {
   NonemptyListWithOptionalEndSep(list, _) {
     const sourceMap = this.args.sourceMap;
     return list.asIteration().toAST(sourceMap);
+  },
+
+  NonemptyListOf(_, __, ___) {
+    const sourceMap = this.args.sourceMap;
+    return this.asIteration().toAST(sourceMap);
   },
 
   _terminal() {

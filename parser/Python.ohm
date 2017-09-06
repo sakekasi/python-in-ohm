@@ -1,4 +1,3 @@
-const pythonGrammar = ohm.grammar(`
 Python {
   Program = (newline | Stmt)* end
   
@@ -57,7 +56,7 @@ Python {
     | ParameterListStarArgs -- starargs
   ParameterListStarArgs = "*" Parameter? ("," DefParameter)* ("," ("**" Parameter ","?)?)? -- argsAndKwargs
     | "**" Parameter ","? -- kwargs
-  Parameter = identifier // (":" Expr)? // TODO
+  Parameter = identifier (":" Expr)?
   DefParameter = Parameter ("=" Expr)?
 
   Varargslist = Vfpdef ("=" Expr)? ("," Vfpdef ("=" Expr)?)* ("," VarArgsRest)? -- positional
@@ -74,11 +73,11 @@ Python {
   StarredItem = "*" OrExpr -- star
     | Expr
 
-  Expr = lambda ParameterList? ":" Expr -- lambda
-    | OrTest (if OrTest else Expr)? -- cond
-
-  Expr_nocond = lambda ParameterList? ":" Expr_nocond -- lambda
-    | OrTest
+  Expr = OrTest (if OrTest else Expr)? -- cond
+    | lambda ParameterList? ":" Expr -- lambda
+    
+  Expr_nocond = OrTest
+    | lambda ParameterList? ":" Expr_nocond -- lambda
 
   OrTest = OrTest or AndTest -- or
     | AndTest
@@ -189,13 +188,13 @@ Python {
   CompIter = async? for ExprList in OrTest CompIter? -- for
     | if Expr_nocond CompIter? -- if
   
-  newline = "\\n"
+  newline = "\n"
   space := " "
-    | "\\t"
+    | "\t"
     | comment
   indent = "⇨"
   dedent = "⇦"
-  comment = "#" (~"\\n" any)*
+  comment = "#" (~"\n" any)*
   
   identifier = id_start id_continue*
   id_start = "_"
@@ -234,25 +233,25 @@ Python {
   
   stringliteral = stringprefix? (shortstring | longstring)
   stringprefix = "r" | "u" | "R" | "U" | "f" | "F" | "fr" | "Fr" | "fR" | "FR" | "rf" | "rF" | "Rf" | "RF"
-  shortstring = "'" shortstringitem<"'">* "'" | "\\"" shortstringitem<"\\"">* "\\""
-  longstring = "'''" longstringitem* "'''" | "\\"\\"\\"" longstringitem* "\\"\\"\\""
+  shortstring = "'" shortstringitem<"'">* "'" | "\"" shortstringitem<"\"">* "\""
+  longstring = "'''" longstringitem* "'''" | "\"\"\"" longstringitem* "\"\"\""
   shortstringitem<quote> = shortstringchar<quote> | stringescapeseq
   longstringitem = longstringchar | stringescapeseq
-  shortstringchar<quote> = ~(quote|newline|"\\\\") any
-  longstringchar = ~"\\\\" any
-  stringescapeseq = "\\\\" any
+  shortstringchar<quote> = ~(quote|newline|"\\") any
+  longstringchar = ~"\\" any
+  stringescapeseq = "\\" any
   
   bytesliteral = bytesprefix (shortbytes | longbytes)
   bytesprefix = "b" | "B" | "br" | "Br" | "bR" | "BR" | "rb" | "rB" | "Rb" | "RB"
-  shortbytes = "'" shortbytesitem<"'">* "'" | "\\"" shortbytesitem<"\\"">* "\\""
-  longbytes = "'''" longbytesitem* "'''" | "\\"\\"\\"" longbytesitem* "\\"\\"\\""
+  shortbytes = "'" shortbytesitem<"'">* "'" | "\"" shortbytesitem<"\"">* "\""
+  longbytes = "'''" longbytesitem* "'''" | "\"\"\"" longbytesitem* "\"\"\""
   shortbytesitem<quote> = shortbyteschar<quote> | bytesescapeseq
   longbytesitem = longbyteschar | bytesescapeseq
-  shortbyteschar<quote> = ~("\\\\" | newline | quote) ascii
-  longbyteschar = ~"\\\\" ascii
-  bytesescapeseq = "\\\\" ascii
+  shortbyteschar<quote> = ~("\\" | newline | quote) ascii
+  longbyteschar = ~"\\" ascii
+  bytesescapeseq = "\\" ascii
  
-  ascii = "\\u0000".."\\u007F"
+  ascii = "\u0000".."\u007F"
   
   async = "async"
   await = "await"
@@ -312,6 +311,3 @@ Python {
   
   NonemptyListWithOptionalEndSep<elem, sep> = NonemptyListOf<elem, sep> sep?
 }
-`);
-
-window.grammar = pythonGrammar;

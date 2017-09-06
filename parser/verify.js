@@ -40,3 +40,24 @@ BinOp.prototype.verify = function(code) {
   this.left.verify(code);
   this.right.verify(code);
 };
+
+Lambda.prototype.verify = function(code) {
+  AST.prototype.verify.call(this, code);
+  this.args.verify(code);
+  this.body.verify(code);
+};
+
+Arguments.prototype.verify = function(code) {
+  AST.prototype.verify.call(this, code);
+  this.args.forEach(arg => arg.verify(code));
+  if (this.vararg) {
+    this.vararg.verify(code);
+  }
+  this.kwonlyargs.forEach(arg => arg.verify(code));
+  if (this.kwarg) {
+    this.kwarg.verify(code);
+  }
+
+  this.defaults.forEach(default_ => default_ ? default_.verify(code) : null);
+  this.kw_defaults.forEach(default_ => default_ ? default_.verify(code) : null);
+};

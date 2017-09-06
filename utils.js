@@ -13,3 +13,13 @@ function range(from, to) {
 function last(arr) {
   return arr[arr.length - 1];
 }
+
+function repeat(str, n) {
+  let ans = '';
+  range(1, n).forEach(() => ans += str);
+  return ans;
+}
+
+function spaces(n) {
+  return repeat(' ', n);
+}

@@ -1,5 +1,14 @@
 const tests = [
   {
+    unpreprocessed: `from functools import reduce
+
+ans = reduce(
+  lambda x, y:
+    x + y,
+  [1, 2, 3, 4], 0)`,
+    rule: 'Program'
+  },
+  {
     unpreprocessed: `sum = 0
 for x in range(5): 
   sum = sum + x`,
@@ -218,7 +227,7 @@ self . y = y
 
 const preprocessor = new Preprocessor();
 tests.forEach(({unpreprocessed, code, rule}, idx) => {
-  if (idx > 0) return;
+  if (idx > 1) return;
   let result;
   let map;
   if (unpreprocessed) {
@@ -235,10 +244,18 @@ tests.forEach(({unpreprocessed, code, rule}, idx) => {
     const ast = semantics(result).toAST(map);
     console.log(ast);
     console.log(ast.toString());
+    
     if (unpreprocessed) {
-      console.log('VERIFYING');
+      console.log('\nVERIFYING');
       ast.verify(unpreprocessed);
     }
+
+    const instrumented = ast.instrumented({
+      executionOrderCounters: [],
+      envId: 0,
+    });
+    console.log(instrumented);
+    console.log(instrumented.toString());
   } else {
     console.log(code);
     console.log(rule, 'FAILED');
