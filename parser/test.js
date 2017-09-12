@@ -1,5 +1,15 @@
 const tests = [
   {
+    unpreprocessed: `def less(a, b):
+  return a < b
+
+def five():
+  return 5
+
+a = five() if less(3, 5) else 2`,
+    rule: 'Program'
+  },
+  {
     unpreprocessed: `from functools import reduce
 
 ans = reduce(
@@ -227,7 +237,7 @@ self . y = y
 
 const preprocessor = new Preprocessor();
 tests.forEach(({unpreprocessed, code, rule}, idx) => {
-  if (idx > 1) return;
+  if (idx > 2) return;
   let result;
   let map;
   if (unpreprocessed) {
@@ -253,6 +263,8 @@ tests.forEach(({unpreprocessed, code, rule}, idx) => {
     const instrumented = ast.instrumented({
       executionOrderCounters: [],
       envId: 0,
+      lambdaId: 0,
+      lambdas: [],
     });
     console.log(instrumented);
     console.log(instrumented.toString());

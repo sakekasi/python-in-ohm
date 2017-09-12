@@ -28,6 +28,18 @@ semantics.addOperation('toAST(sourceMap)', {
   // SimpleStmt_annassign() {}, // TODO
   // SimpleStmt_augassign() {}, // TODO
 
+  SimpleStmt_return(_, optExprList) {
+    const sourceMap = this.args.sourceMap;
+    let value;
+    if (optExprList.numChildren === 1) {
+      value = tupleOrExpr(optExprList.sourceLoc(sourceMap)[0], optExprList.toAST(sourceMap)[0]);
+    } else {
+      value = new NameConstant(null, 'None');
+    }
+
+    return new Return(this.sourceLoc(sourceMap), value);
+  },
+
   ImportStmt_from(_, moduleCst, __, nameCsts) {
     const sourceMap = this.args.sourceMap;
     const [module, level] = moduleCst.toAST(sourceMap);
@@ -64,6 +76,17 @@ semantics.addOperation('toAST(sourceMap)', {
       orelse = orelse[0];
     }
     return new For(this.sourceLoc(sourceMap), target, iter, body, orelse);
+  },
+
+  CompoundStmt_funcdef(decoratorCsts, _, nameCst, __, optParamCsts, ___, ____, optReturnCst, bodyCst) {
+    const sourceMap = this.args.sourceMap;
+    const decorators = decoratorCsts.toAST(sourceMap);
+    const name = nameCst.sourceString;
+    const params = optParamCsts.numChildren === 1 ? optParamCsts.toAST(sourceMap)[0] : null;
+    const returns = optReturnCst.numChildren === 1 ? optReturnCst.toAST(sourceMap)[0] : null;
+    const body = bodyCst.toAST(sourceMap);
+
+    return new FunctionDef(this.sourceLoc(sourceMap), name, params, body, decorators, returns);
   },
 
   Suite_single(_, stmtCst, __) {
@@ -103,7 +126,7 @@ semantics.addOperation('toAST(sourceMap)', {
     if (test.length === 0) {
       return left;
     } else {
-      return new IfExp(this.sourceLoc(sourceMap), or, test[0], else_[0]);
+      return new IfExp(this.sourceLoc(sourceMap), test[0], left, else_[0]);
     }
   },
 
@@ -144,7 +167,7 @@ semantics.addOperation('toAST(sourceMap)', {
     if (ops.length === 0) {
       return left;
     } else {
-      return new Compare(left, ops, right);
+      return new Compare(this.sourceLoc(sourceMap), left, ops, rights);
     }
   },
 
@@ -395,7 +418,7 @@ semantics.addOperation('toAST(sourceMap)', {
 
   identifier(_, __) { 
     const sourceMap = this.args.sourceMap;
-    return new Identifier(this.sourceLoc(sourceMap), this.sourceString); 
+    return new Name(this.sourceLoc(sourceMap), this.sourceString); 
   },
 
   integer(_) {

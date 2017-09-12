@@ -40,9 +40,9 @@ Python {
     | try Suite (except (Expr (as identifier)?)? Suite)+ (else Suite)? (finally Suite)? -- tryWithExcept
     | try Suite finally Suite -- tryWithoutExcept
     | with NonemptyListOf<WithItem, ","> Suite -- with
-    | Decorator* def identifier ParameterList ("->" Expr)? Suite -- funcdef
+    | Decorator* def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- funcdef
     | Decorator* class identifier ("(" ArgList? ")")? Suite -- classdef
-    | Decorator* async def identifier ParameterList ("->" Expr)? Suite -- asyncFuncDef
+    | Decorator* async def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- asyncFuncDef
     | async CompoundStmt_with -- asyncWith
     | async CompoundStmt_for -- asyncFor
   

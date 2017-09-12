@@ -31,9 +31,9 @@ class Operator extends Token {
 }
 Operator.regex = /\+|-|\*\*|\*|\/\/|\/|%|@|<<|>>|&|\||\^|~|<|>|<=|>=|==|!=/u
 
-class Literal extends Token {}
+class LiteralT extends Token {}
 
-class StringLiteral extends Literal {
+class StringLiteral extends LiteralT {
   static create(state, value) {
     return new StringLiteral(value, ...state.getRange(value));
   }
@@ -54,7 +54,7 @@ const longString = `(${singleQuoteLongString}|${doubleQuoteLongString})`;
 
 StringLiteral.regex = new RegExp(`${prefix}?(${longString}|${shortString})`, 'u');
 
-class BytesLiteral extends Literal {
+class BytesLiteral extends LiteralT {
   static create(state, value) {
     return new BytesLiteral(value, ...state.getRange(value));
   }
@@ -63,14 +63,14 @@ class BytesLiteral extends Literal {
 const bytesPrefix = `(b|B|br|Br|bR|BR|rb|rB|Rb|RB)`
 BytesLiteral.regex = new RegExp(`${bytesPrefix}(${longString}|${shortString})`);
 
-class IntegerLiteral extends Literal {
+class IntegerLiteral extends LiteralT {
   static create(state, value) {
     return new IntegerLiteral(value, ...state.getRange(value));
   }
 }
 IntegerLiteral.regex = /[1-9](_?[0-9])*|0(b|B)(_?[01])+|0(o|O)(_?[0-7])+|0(x|X)(_?[0-9a-fA-F])+|0+(_?0)*/u
 
-class FloatingPointLiteral extends Literal {
+class FloatingPointLiteral extends LiteralT {
   static create(state, value) {
     return new FloatingPointLiteral(value, ...state.getRange(value));
   }
