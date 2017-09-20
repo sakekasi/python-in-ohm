@@ -165,6 +165,7 @@ class NewLine extends Token {
       let lastIndentation = state.indentationStack.join('');
       let lastIndentationLevel = lastIndentation.length;
       if (currentIndentationLevel === lastIndentationLevel) {
+        state.getRange(currentIndentation);
         if (currentIndentation !== lastIndentation) {
           throw new Error('indentation error');
         }

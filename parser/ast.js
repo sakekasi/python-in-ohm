@@ -107,6 +107,7 @@ class Bytes extends Literal {
 class List extends Literal {
   constructor(sourceLoc, elts, ctx=(new Load())) {
     super(sourceLoc);
+    if (elts == null) debugger;
     this.elts = elts;
     this.ctx = ctx;
   }
@@ -136,7 +137,7 @@ class Tuple extends Literal {
   }
 }
 
-class Set extends Literal {
+class SetAST extends Literal {
   constructor(sourceLoc, elts) {
     super(sourceLoc);
     this.elts = elts;
@@ -227,7 +228,7 @@ class Starred extends Expr {
   }
 
   toString() {
-    return '* ( ' + this.value.toString()  + ' )'
+    return '* ' + this.value.toString();
   }
 
   get children() {
@@ -306,6 +307,7 @@ class Call extends Expr {
   constructor(sourceLoc, /*Expr*/ func, /*Expr**/ args, /*Keyword**/ keywords) {
     super(sourceLoc);
     this.func = func;
+    if (args === undefined) debugger;
     this.args = args;
     this.keywords = keywords;
   }
@@ -333,6 +335,14 @@ class Keyword extends AST {
     this.value = value;
   }
 
+  toString() {
+    if (this.arg === null) {
+      return '** ' + this.value.toString();
+    } else {
+      return this.arg + '=' + ' ( ' + this.value.toString() + ' ) ';
+    }
+  }
+
   get children() {
     return [this.arg, this.value];
   }
@@ -356,10 +366,11 @@ class IfExp extends Expr {
 }
 
 class Attribute extends Expr {
-  constructor(sourceLoc, value, attr) { // TODO: ctx
+  constructor(sourceLoc, value, attr, ctx=(new Load())) {
     super(sourceLoc);
     this.value = value;
     this.attr = attr;
+    this.ctx = ctx;
   }
 
   toString() {
@@ -375,10 +386,11 @@ class Attribute extends Expr {
 // ---------------
 
 class Subscript extends Expr {
-  constructor(sourceLoc, value, slice) { // TODO: ctx
+  constructor(sourceLoc, value, slice, ctx=(new Load())) {
     super(sourceLoc);
     this.value = value;
     this.slice = slice;
+    this.ctx = ctx;
   }
 
   toString() {
@@ -543,6 +555,10 @@ class AugAssign extends Stmt {
   get children() {
     return [this.target, this.value];
   }
+
+  toString(indentation = 0) {
+    return spaces(indentation) + this.target.toString() + ' ' + this.op + ' ' + this.value.toString() + '\n';
+  }
 }
 
 class Raise extends Stmt {
@@ -657,15 +673,37 @@ class Alias extends AST {
 // ---------
 
 class If extends Stmt {
-  constructor(sourceLoc, test, body, orelse) {
+  constructor(sourceLoc, tests, bodies, orelse) {
     super(sourceLoc);
-    this.test = test;
-    this.body = body;
+    this.tests = tests;
+    this.bodies = bodies;
     this.orelse = orelse;
   }
 
   get children() {
-    return [this.test, ...this.body, ...(this.orelse || [])];
+    return [...this.tests, ...flatten(this.bodies), ...(this.orelse || [])];
+  }
+
+  toString(indentation = 0) {
+    const test = this.tests[0];
+    const body = this.bodies[0];
+    const elifTests = this.tests.slice(1);
+    const elifBodies = this.bodies.slice(1);
+    const i = spaces(indentation);
+
+    let ans = '';
+    ans += i + 'if ' + test.toString() + ' :\n';
+    ans += body.map(stmt => stmt.toString(indentation + 2)).join('');
+    elifTests.forEach((elifTest, i) => {
+      const elifBody = elifBodies[i];
+      ans += i + 'elif ' + elifTest.toString() + ' :\n';
+      ans += elifBody.map(stmt => stmt.toString(indentation + 2)).join('');
+    });
+    if (this.orelse !== null) {
+      ans += i + 'else:\n';
+      ans += this.orelse.map(stmt => stmt.toString(indentation + 2)).join('');
+    }
+    return ans;
   }
 }
 
@@ -704,6 +742,19 @@ class While extends Stmt {
 
   get children() {
     return [this.test, ...this.body, ...(this.orelse || [])];
+  }
+
+  toString(indentation = 0) {
+    const i = spaces(indentation);
+
+    let ans = '';
+    ans += i + 'while ' + this.test.toString() + ':\n';
+    ans += this.body.map(stmt => stmt.toString(indentation + 2)).join('');
+    if (this.orelse !== null) {
+      ans += 'else:\n';
+      ans += this.orelse.map(stmt => stmt.toString(indentation + 2)).join('');
+    }
+    return ans;
   }
 }
 
@@ -843,7 +894,7 @@ class Arguments extends AST {
     let ans = [];
 
     this.args.forEach((arg, idx) => {
-      const default_ =  this.defaults[idx];
+      const default_ =  this.defaults[idx] || null;
       let argstr = arg.toString();
       if (default_ !== null) {
         argstr += ' = ' + default_.toString();
@@ -951,21 +1002,37 @@ class Nonlocal extends Stmt {
 }
 
 class ClassDef extends Stmt {
-  constructor(sourceLoc, name, bases, keywords, starargs, kwargs, body, decoratorList) {
+  constructor(sourceLoc, name, bases, keywords, body, decoratorList) {
     super(sourceLoc);
     this.name = name;
     this.bases = bases;
     this.keywords = keywords;
-    this.starargs = starargs;
-    this.kwargs = kwargs;
     this.body = body;
     this.decoratorList = decoratorList;
   }
 
   get children() {
     return [
-      ...this.bases, ...this.keywords, ...this.starargs, ...this.kwargs, ...this.body, ...this.decoratorList
+      ...this.bases, ...this.keywords, ...this.body, ...this.decoratorList
     ];
+  }
+
+  toString(indentation = 0) {
+    const i = spaces(indentation);
+    let ans = '';
+    if (this.decoratorList.length > 0) {
+      ans += i + this.decoratorList.map(decorator => decorator.toString()).join('\n') + '\n';
+    }
+    ans += i + 'class ' + this.name.toString();
+    if (this.args !== null) {
+      ans += ' ( ';
+      ans += this.bases.map(base => base.toString()).join(',');
+      ans += this.keywords.map(kw => kw.toString()).join(',');
+      ans += ' ) ';
+    }
+    ans += ':\n'
+    ans += this.body.map(stmt => stmt.toString(indentation + 2)).join('');
+    return ans;
   }
 }
 

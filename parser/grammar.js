@@ -8,7 +8,7 @@ Python {
   StmtList = NonemptyListWithOptionalEndSep<SimpleStmt, ";">
   
   SimpleStmt = assert Expr ("," Expr)? -- assert
-    | (TargetList "=")+ (StarredExpr | YieldExpr) -- assign
+    | (~((StarredExpr | YieldExpr) stmtSep) TargetList "=")+ (StarredExpr | YieldExpr) -- assign
     | AugTarget augassign (ExprList | YieldExpr) -- augassign
     | AugTarget ":" Expr ("=" Expr)? -- annassign
     | pass -- pass
@@ -22,6 +22,8 @@ Python {
     | continue -- continue
     | global NonemptyListOf<identifier, ","> -- global
     | nonlocal NonemptyListOf<identifier, ","> -- nonlocal
+  
+  stmtSep = ";" | newline
 
   ImportStmt = import NonemptyListOf<ModuleAsName, ","> -- normal
     | from RelativeModule import NonemptyListOf<IdentifierAsName, ","> -- from
@@ -167,18 +169,19 @@ Python {
   KeywordsArguments = NonemptyListOf<KeywordsArgument, ",">
 
   TargetList = NonemptyListWithOptionalEndSep<Target, ",">
-  Target = identifier -- identifier
+  Target = 
     | "(" TargetList? ")" -- tuple
     | "[" TargetList? "]" -- list
     | PrimaryExpr_attributeref -- attributeref
     | PrimaryExpr_subscription -- subscription
     | PrimaryExpr_slicing -- slicing
     | "*" Target -- star
+    | identifier -- identifier
   
-  AugTarget = identifier
-    | Target_attributeref
+  AugTarget = Target_attributeref
     | Target_subscription
     | Target_slicing
+    | identifier
 
   KeyDatumList = NonemptyListWithOptionalEndSep<KeyDatum, ",">
   KeyDatum = Expr ":" Expr -- keyValue

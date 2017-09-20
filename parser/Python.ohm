@@ -39,9 +39,9 @@ Python {
     | try Suite (except (Expr (as identifier)?)? Suite)+ (else Suite)? (finally Suite)? -- tryWithExcept
     | try Suite finally Suite -- tryWithoutExcept
     | with NonemptyListOf<WithItem, ","> Suite -- with
-    | Decorator* def identifier ParameterList ("->" Expr)? Suite -- funcdef
+    | Decorator* def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- funcdef
     | Decorator* class identifier ("(" ArgList? ")")? Suite -- classdef
-    | Decorator* async def identifier ParameterList ("->" Expr)? Suite -- asyncFuncDef
+    | Decorator* async def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- asyncFuncDef
     | async CompoundStmt_with -- asyncWith
     | async CompoundStmt_for -- asyncFor
   
@@ -56,7 +56,7 @@ Python {
     | ParameterListStarArgs -- starargs
   ParameterListStarArgs = "*" Parameter? ("," DefParameter)* ("," ("**" Parameter ","?)?)? -- argsAndKwargs
     | "**" Parameter ","? -- kwargs
-  Parameter = identifier (":" Expr)?
+  Parameter = identifier // (":" Expr)? // TODO
   DefParameter = Parameter ("=" Expr)?
 
   Varargslist = Vfpdef ("=" Expr)? ("," Vfpdef ("=" Expr)?)* ("," VarArgsRest)? -- positional
@@ -73,11 +73,11 @@ Python {
   StarredItem = "*" OrExpr -- star
     | Expr
 
-  Expr = OrTest (if OrTest else Expr)? -- cond
-    | lambda ParameterList? ":" Expr -- lambda
-    
-  Expr_nocond = OrTest
-    | lambda ParameterList? ":" Expr_nocond -- lambda
+  Expr = lambda ParameterList? ":" Expr -- lambda
+    | OrTest (if OrTest else Expr)? -- cond
+
+  Expr_nocond = lambda ParameterList? ":" Expr_nocond -- lambda
+    | OrTest
 
   OrTest = OrTest or AndTest -- or
     | AndTest

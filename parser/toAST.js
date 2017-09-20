@@ -26,7 +26,16 @@ semantics.addOperation('toAST(sourceMap)', {
   },
 
   // SimpleStmt_annassign() {}, // TODO
-  // SimpleStmt_augassign() {}, // TODO
+
+  SimpleStmt_augassign(targetCst, augOpCst, valueCst) {
+    const sourceMap = this.args.sourceMap;
+    const target = targetCst.toAST(sourceMap);
+    const op = augOpCst.sourceString;
+    const value = valueCst.ctorName === 'ExprList' ?
+      valueCst.toAST(sourceMap)[0] : valueCst.toAST(sourceMap);
+
+    return new AugAssign(this.sourceLoc(sourceMap), target, op, value);
+  },
 
   SimpleStmt_return(_, optExprList) {
     const sourceMap = this.args.sourceMap;
@@ -38,6 +47,12 @@ semantics.addOperation('toAST(sourceMap)', {
     }
 
     return new Return(this.sourceLoc(sourceMap), value);
+  },
+
+  SimpleStmt_expr(exprCst) {
+    const sourceMap = this.args.sourceMap;
+    const expr = exprCst.toAST(sourceMap);
+    return new ExprStmt(this.sourceLoc(sourceMap), expr);
   },
 
   ImportStmt_from(_, moduleCst, __, nameCsts) {
@@ -64,6 +79,27 @@ semantics.addOperation('toAST(sourceMap)', {
     return new Alias(this.sourceLoc(sourceMap), name, asName);
   },
 
+  CompoundStmt_if(_, testCst, bodyCst, __, elifTestCsts, elifBodyCsts, ___, optElseBodyCst) {
+    const sourceMap = this.args.sourceMap;
+    const test = testCst.toAST(sourceMap);
+    const body = flattenAndFilterNulls(bodyCst.toAST(sourceMap));
+    const elifTests = elifTestCsts.toAST(sourceMap);
+    const elifBodies = elifBodyCsts.toAST(sourceMap).map(body => flattenAndFilterNulls(body));
+    const orelse = optElseBodyCst.numChildren === 1 ? flattenAndFilterNulls(optElseBodyCst.toAST(sourceMap)[0]) : null;
+
+    return new If(this.sourceLoc(sourceMap),
+      [test].concat(...elifTests), [body].concat(...elifBodies), orelse);
+  },
+
+  CompoundStmt_while(_, testCst, bodyCst, __, optElseCst) {
+    const sourceMap = this.args.sourceMap;
+    const test = testCst.toAST(sourceMap);
+    const body = flattenAndFilterNulls(bodyCst.toAST(sourceMap));
+    const orelse = optElseCst.numChildren === 1 ? flattenAndFilterNulls(optElse.toAST(sourceMap)[0]) : null;
+
+    return new While(this.sourceLoc(sourceMap), test, body, orelse);
+  },
+
   CompoundStmt_for(_, targetCst, __, iterCst, bodyCst, ___, optElseCst ) {
     const sourceMap = this.args.sourceMap;
     const target = tupleOrExpr(targetCst.sourceLoc(sourceMap), targetCst.toAST(sourceMap));
@@ -87,6 +123,20 @@ semantics.addOperation('toAST(sourceMap)', {
     const body = bodyCst.toAST(sourceMap);
 
     return new FunctionDef(this.sourceLoc(sourceMap), name, params, body, decorators, returns);
+  },
+
+  CompoundStmt_classdef(decoratorCsts, _, nameCst, __, optArgCst, ___, bodyCst) {
+    const sourceMap = this.args.sourceMap;
+    const decorators = decoratorCsts.toAST(sourceMap);
+    const name = nameCst.sourceString;
+    const args = optArgCst.children.length === 1 ? optArgCst.toAST(sourceMap)[0][0] : null;
+    const body = bodyCst.toAST(sourceMap);
+    
+    console.assert(!args.positional.some(arg => arg instanceof Starred));
+    console.assert(!args.keyword.some(arg => arg instanceof Keyword && arg.arg === null));
+
+
+    return new ClassDef(this.sourceLoc(sourceMap), name, args.positional, args.keyword, body, decorators);
   },
 
   Suite_single(_, stmtCst, __) {
@@ -171,13 +221,13 @@ semantics.addOperation('toAST(sourceMap)', {
     }
   },
 
-  StarredExpr_star(starredItemList) { // TODO
+  StarredExpr_star(starredItemList) {
     const sourceMap = this.args.sourceMap;
     const maybeStarredItems = starredItemList.asIteration().toAST(sourceMap);
     if (maybeStarredItems.length === 1) {
       return maybeStarredItems[0];
     } else {
-      throw new Error('TODO: implement multiple starred items');
+      return new Tuple(this.sourceLoc(sourceMap), maybeStarredItems);
     }
   },
 
@@ -283,7 +333,7 @@ semantics.addOperation('toAST(sourceMap)', {
   PrimaryExpr_attributeref(valueCst, _, attrCst) {
     const sourceMap = this.args.sourceMap;
     const value = valueCst.toAST(sourceMap);
-    const attr = attrCst.toAST(sourceMap);
+    const attr = attrCst.sourceString;
     return new Attribute(this.sourceLoc(sourceMap), value, attr);
   },
 
@@ -306,16 +356,6 @@ semantics.addOperation('toAST(sourceMap)', {
       const args = argsOrComp[0];
       return new Call(this.sourceLoc(sourceMap), func, args.positional, args.keyword);
     }
-  },
-
-  ArgList(positionalArguments, _, optKeywordsArguments, __) {
-    const sourceMap = this.args.sourceMap;
-    const positional = positionalArguments.toAST(sourceMap);
-    let keyword = optKeywordsArguments.toAST(sourceMap);
-    if (keyword.length > 0) {
-      keyword = keyword[0];
-    }
-    return {positional, keyword};
   },
 
   // Atom_tuple() {}, // TODO
@@ -396,6 +436,25 @@ semantics.addOperation('toAST(sourceMap)', {
     const expr = exprCst.toAST(sourceMap);
     return new Keyword(this.sourceLoc(sourceMap), null, expr);
   }, // TODO context Param
+
+  ArgList(positionalArguments, _, optKeywordsArguments, __) {
+    const sourceMap = this.args.sourceMap;
+    const positional = positionalArguments.toAST(sourceMap);
+    let keyword = optKeywordsArguments.toAST(sourceMap);
+    if (keyword.length > 0) {
+      keyword = keyword[0];
+    }
+    return {positional, keyword};
+  },
+
+  TargetList(targetCsts) {
+    const sourceMap = this.args.sourceMap;
+    const targets = targetCsts.toAST(sourceMap);
+    if (targets.slice(0, -1).some(target => target instanceof Starred)) {
+      throw new Error('TargetList cannot contain starred in the middle');
+    }
+    return targets;
+  },
 
   newline(_) { return null; },
 

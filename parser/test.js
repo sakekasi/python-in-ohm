@@ -1,5 +1,59 @@
 const tests = [
   {
+    unpreprocessed: `class Point(object):
+  def __init__(self, x, y):
+    self.x = x
+    self.y = y
+
+  def __str__(self):
+    sx = str(self.x)
+    sy = str(self.y)
+    return "(" + sx + ", " + sy + ")"
+
+  def toDebugString(self):
+    return str(self)
+
+  def move(self):
+    self.x = self.x + 5
+    self.y = self.y - 7
+
+p = Point(1, 2)
+s = str(p)
+
+before = p
+p.move()
+after = p`,
+    rule: 'Program'
+  },
+  {
+    unpreprocessed: `a, b = 5, 6
+a, b = b, a
+a.b += c`,
+    rule: 'Program'
+  },
+  {
+    unpreprocessed: `sum = 0
+i = 0
+while i < 10:
+  sum += i
+  i += 1`,
+    rule: 'Program'
+  },
+  {
+    unpreprocessed: `def fib(n):
+  if n < 2:
+    return n
+  else:
+    fa = fib(n-1)
+    fb = fib(n-2)
+    return fa + fb
+
+
+for x in range(5): 
+  fx = fib(x)`,
+    rule: 'Program'
+  },
+  {
     unpreprocessed: `def less(a, b):
   return a < b
 
@@ -237,7 +291,7 @@ self . y = y
 
 const preprocessor = new Preprocessor();
 tests.forEach(({unpreprocessed, code, rule}, idx) => {
-  if (idx > 2) return;
+  if (idx > 0) return;
   let result;
   let map;
   if (unpreprocessed) {
@@ -260,12 +314,7 @@ tests.forEach(({unpreprocessed, code, rule}, idx) => {
       ast.verify(unpreprocessed);
     }
 
-    const instrumented = ast.instrumented({
-      executionOrderCounters: [],
-      envId: 0,
-      lambdaId: 0,
-      lambdas: [],
-    });
+    const instrumented = ast.instrumented(new InstrumenterState());
     console.log(instrumented);
     console.log(instrumented.toString());
   } else {

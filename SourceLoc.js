@@ -4,6 +4,14 @@ class SourceLoc {
     this.endIdx = endIdx;
   }
 
+  get startLineNumber() {
+    return SourceLoc.codeMap[this.startIdx];
+  }
+
+  get endLineNumber() {
+    return SourceLoc.codeMap[this.endIdx - 1];
+  }
+
   equals(sourceLoc) {
     return this.startIdx === sourceLoc.startIdx && this.endIdx === sourceLoc.endIdx;
   }
@@ -31,5 +39,17 @@ class SourceLoc {
       str('startIdx'), this.startIdx,
       str('endIdx'), this.endIdx
     );
+  }
+
+  static setupCodeMap(code) {
+    SourceLoc.codeMap = {};
+    let lineNumber = 1;
+    range(0, code.length-1).forEach(i => {
+      const char = code.charAt(i);
+      if (char === '\n') {
+        lineNumber++;
+      }
+      SourceLoc.codeMap[i] = lineNumber;
+    });
   }
 }

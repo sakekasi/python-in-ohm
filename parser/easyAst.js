@@ -1,4 +1,4 @@
-function prog(body, sourceLoc = null) {
+function program(body, sourceLoc = null) {
   console.assert(body instanceof Array);
 
   return new Program(sourceLoc, body);
@@ -23,7 +23,7 @@ function assign(targets, value, sourceLoc = null) {
     targets = [targets];
   }
   console.assert(targets instanceof Array);
-  console.assert(value instanceof Expr || value instanceof Identifier);
+  console.assert(value instanceof Expr);
 
   return new Assign(sourceLoc,
     targets instanceof Array ? targets : [targets], value);
@@ -36,6 +36,14 @@ function for_(target, iter, body, orelse = null, sourceLoc = null) {
   console.assert(orelse === null || orelse instanceof Array);
 
   return new For(sourceLoc, target, iter, body, orelse);
+}
+
+function while_(test, body, orelse = null, sourceLoc = null) {
+  console.assert(test instanceof Expr);
+  console.assert(body instanceof Array);
+  console.assert(orelse === null || orelse instanceof Array);
+
+  return new While(sourceLoc, test, body, orelse);
 }
 
 function exprS(expr, sourceLoc = null) {
@@ -84,6 +92,14 @@ function call(func, args, keywords = [], sourceLoc = null) {
   return new Call(sourceLoc, func, args, keywords);
 }
 
+function slice(lower, upper = null, step = null, sourceLoc = null) {
+  return new Slice(sourceLoc, lower, upper, step);
+}
+
+function index(value, sourceLoc = null) {
+  return new Index(sourceLoc, value);
+}
+
 function n(value, sourceLoc = null) {
   console.assert(typeof value === 'number' || typeof value === 'string');
 
@@ -119,17 +135,16 @@ function star(value, sourceLoc = null) {
   return new Starred(sourceLoc, value);
 }
 
+function doubleStar(value, sourceLoc = null) {
+  return new Keyword(sourceLoc, null, value);
+}
+
 function id(value, sourceLoc = null) {
   console.assert(typeof value === 'string');
 
   return new Name(sourceLoc, value);
 }
 
-function idx(value, sourceLoc = null) {
-  console.assert(value instanceof Expr || value instanceof Identifier);
-
-  return new Index(sourceLoc, value);
-}
 
 function args(positional, vararg = null, kwonly = [], kw = null, defaults = null, kwdefaults = null, sourceLoc = null) {
   if (defaults === null) {
@@ -141,4 +156,8 @@ function args(positional, vararg = null, kwonly = [], kw = null, defaults = null
       .map(_ => null);
   }
   return new Arguments(sourceLoc, positional, vararg, kwonly, kw, defaults, kwdefaults);
+}
+
+function clsDef(name, bases, keywords, body, decoratorList = [], sourceLoc = null) {
+  return new ClassDef(sourceLoc, name, bases, keywords, body, decoratorList);
 }
