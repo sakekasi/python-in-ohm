@@ -1,5 +1,6 @@
 class SourceMap {
-  constructor() {
+  constructor(old) {
+    this.old = old;
     this.newToOrig = {};
     this.origToNew = {};
   }
@@ -24,12 +25,20 @@ class SourceMap {
   }
 
   originalIdx(newIdx) {
+    if (newIdx >= this.new.length) {
+      return this.newToOrig[this.new.length];
+    }
     console.assert(newIdx in this.newToOrig);
     return this.newToOrig[newIdx];
   }
 
   newIdx(originalIdx) {
-    console.assert(newIdx in this.origToNew);
+    while (!(originalIdx in this.origToNew) && originalIdx < this.old.length) {
+      originalIdx++;
+    }
+    if (originalIdx >= this.old.length) {
+      return this.origToNew[this.old.length];
+    }
     return this.origToNew[originalIdx];
   }
 }

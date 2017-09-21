@@ -24,7 +24,7 @@ class Preprocessor {
   preprocess(code) {
     console.debug(code);
 
-    this.state.reset();
+    this.state.reset(code);
     this.lexer.setInput(code);
     const tokens = [];
     let token;
@@ -59,6 +59,8 @@ class Preprocessor {
     // the position just after the end of the original text
     this.state.sourceMap.mapSingle(code.length, 
         this.state.preprocessedCode.length, this.state.preprocessedCode.length + 1);
+    
+    this.state.sourceMap.new = this.state.preprocessedCode;
         
     return {
       code: this.state.preprocessedCode,
@@ -69,15 +71,15 @@ class Preprocessor {
 
 class PreprocessorState {
   constructor() {
-    this.reset();
+    this.reset('');
   }
 
-  reset() {
+  reset(code) {
     this.parenStack = [];
     this.indentationStack = [''];
     this.origIdx = 0;
     this.newIdx = 0;
-    this.sourceMap = new SourceMap();
+    this.sourceMap = new SourceMap(code);
     this.preprocessedCode = '';
   }
 
