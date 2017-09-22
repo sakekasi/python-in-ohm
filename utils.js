@@ -2,9 +2,9 @@ function flatten(arrs) {
   return [].concat.apply([], arrs);
 }
 
-function range(from, to) {
+function range(from, to, step = 1) {
   const ans = [];
-  for (let x = from; x <= to; x++) {
+  for (let x = from; x <= to; x+=step) {
     ans.push(x);
   }
   return ans;

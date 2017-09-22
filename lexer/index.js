@@ -21,51 +21,16 @@ class Preprocessor {
     this.lexer.addRule(Delimiter.regex, _.partial(Delimiter.create, this.state));
   }
 
-  preprocess(code) {
-    console.debug(code);
-
-    this.state.reset(code);
+  lex(code) {
+    const ans = new TokenStream(code, this.lexer);
+    this.state.reset();
     this.lexer.setInput(code);
-    const tokens = [];
     let token;
     while (token = this.lexer.lex()) {
-      tokens.push(token);
-      let tokenString = token.toString();
-      if (!(token instanceof NewLine)) {
-        tokenString += ' '
-      }
-
-      let newStartIdx = this.state.newIdx;
-      this.state.newIdx += token instanceof NewLine ? tokenString.length : tokenString.length - 1;
-      let newEndIdx = this.state.newIdx;
-      if (!(token instanceof NewLine)) {
-        this.state.newIdx++;
-      }
-      
-      this.state.preprocessedCode += tokenString;
-      if (token.startIdx === token.endIdx) {
-        this.state.sourceMap.mapSingle(token.startIdx, newStartIdx, newEndIdx);
-      } else {
-        this.state.sourceMap.map(token.startIdx, token.endIdx, newStartIdx, newEndIdx);
-      }
-
-      if (!(token instanceof NewLine)) {
-        newStartIdx = newEndIdx;
-        newEndIdx = newEndIdx + 1;
-        this.state.sourceMap.mapSingle(token.endIdx, newStartIdx, newEndIdx);
-      }
+      ans.add(token);
     }
-    // map the position just after the end of the preprocessed text to 
-    // the position just after the end of the original text
-    this.state.sourceMap.mapSingle(code.length, 
-        this.state.preprocessedCode.length, this.state.preprocessedCode.length + 1);
-    
-    this.state.sourceMap.new = this.state.preprocessedCode;
-        
-    return {
-      code: this.state.preprocessedCode,
-      map: this.state.sourceMap
-    };
+
+    return ans;
   }
 }
 
@@ -74,13 +39,10 @@ class PreprocessorState {
     this.reset('');
   }
 
-  reset(code) {
+  reset() {
     this.parenStack = [];
     this.indentationStack = [''];
     this.origIdx = 0;
-    this.newIdx = 0;
-    this.sourceMap = new SourceMap(code);
-    this.preprocessedCode = '';
   }
 
   getRange(str) {

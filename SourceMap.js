@@ -17,7 +17,7 @@ class SourceMap {
 
   mapSingle(origIdx, newStart, newEnd) {
     range(newStart, newEnd - 1).forEach(currentNewIdx => {
-      if (currentNewIdx === newStart) {
+      if (currentNewIdx === newStart && !(origIdx in this.origToNew)) {
         this.origToNew[origIdx] = currentNewIdx;
       }
       this.newToOrig[currentNewIdx] = origIdx;

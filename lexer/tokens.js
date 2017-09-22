@@ -8,6 +8,11 @@ class Token {
   toString() {
     return this.value;
   }
+
+  equals(other) {
+    return other instanceof this.constructor &&
+      other.value === this.value;
+  }
 }
 
 class IdentifierT extends Token {
