@@ -2704,3 +2704,8 @@ function testRule(rule) {
     });
   }
 }
+
+console.log(
+  `%c${Object.keys(tests)
+        .map(rule => tests[rule].length)
+        .reduce((a, b) => a + b, 0)} tests!`, 'font-weight: bold; font-size: 40px;');
