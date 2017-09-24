@@ -56,23 +56,28 @@ Python {
   DottedName = NonemptyListOf<identifier, ".">
   
   ParameterList = NonemptyListOf<DefParameter, ","> ("," ParameterListStarArgs?)? -- normal
-    | ParameterListStarArgs -- starargs
+    | ParameterListStarArgs
   ParameterListStarArgs = "*" Parameter? ("," DefParameter)* ("," ("**" Parameter ","?)?)? -- argsAndKwargs
     | "**" Parameter ","? -- kwargs
-  Parameter = identifier // (":" Expr)? // TODO
+  Parameter = identifier (":" Expr)?
   DefParameter = Parameter ("=" Expr)?
 
-  Varargslist = Vfpdef ("=" Expr)? ("," Vfpdef ("=" Expr)?)* ("," VarArgsRest)? -- positional
-  | VarArgsRest -- var
-  VarArgsRest = "*" Vfpdef? ("," Vfpdef ("=" Expr)?)* ("," ("**" Vfpdef ","?)?)? -- single_star
-  | "**" Vfpdef ","? -- double_star
-  Vfpdef = identifier
-
   ExprList = NonemptyListWithOptionalEndSep<Expr, ",">
+
+  ExprList_withoutEndingIn = 
+    | Expr ("," Expr)* "," -- endComma
+    | ExprList_withoutEndingIn_item ("," ExprList_withoutEndingIn_item)* -- noEndComma
+
+  ExprList_withoutEndingIn_item =
+    | Expr &"," -- notEnd
+    | Expr_withoutEndingIn -- end
+
   StarredList = NonemptyListWithOptionalEndSep<StarredItem, ",">
 
-  StarredExpr = ListOf<StarredItem, ","> -- star
+  // TODO: not sure about this
+  StarredExpr = NonemptyListOf<StarredItem, ","> -- star 
     | Expr
+
   StarredItem = "*" OrExpr -- star
     | Expr
 
@@ -81,19 +86,45 @@ Python {
 
   Expr_nocond = lambda ParameterList? ":" Expr_nocond -- lambda
     | OrTest
+  
+  Expr_withoutEndingIn =
+    | lambda ParameterList? ":" Expr_withoutEndingIn -- lambda
+    | OrTest if OrTest else Expr_withoutEndingIn -- cond
+    | OrTest_withoutEndingIn
 
   OrTest = OrTest or AndTest -- or
     | AndTest
+  
+  OrTest_withoutEndingIn =
+    | OrTest or AndTest_withoutEndingIn -- or
+    | AndTest_withoutEndingIn
 
   AndTest = AndTest and NotTest -- and
     | NotTest
+  
+  AndTest_withoutEndingIn =
+    | AndTest and NotTest_withoutEndingIn -- and
+    | NotTest_withoutEndingIn
 
   NotTest = not NotTest -- not
     | Comparison
+  
+  NotTest_withoutEndingIn =
+    | not NotTest_withoutEndingIn -- not
+    | Comparison_withoutEndingIn
 
   Star_expr = "*" Expr
 
-  Comparison = OrExpr (comp_op OrExpr)*
+  Comparison = OrExpr ComparisonRest -- default
+    | OrExpr ComparisonRest_withoutEndingIn -- withoutEndingIn
+  
+  ComparisonRest =
+    | (comp_op OrExpr)* -- default
+    | ComparisonRestItemWithoutEndingIn* -- withoutEndingIn
+  
+  ComparisonRestItemWithoutEndingIn =
+    | in OrExpr &(comp_op OrExpr) -- in
+    | ~in comp_op OrExpr -- default
 
   OrExpr = OrExpr "|" XorExpr -- or
     | XorExpr
@@ -125,16 +156,18 @@ Python {
   AwaitExpr = await PrimaryExpr -- await
     | PrimaryExpr
 
-  PrimaryExpr = PrimaryExpr "." identifier -- attributeref
-    | PrimaryExpr "[" ExprList "]" -- subscription
+  PrimaryExpr = 
+    | PrimaryExpr "." identifier -- attributeref
     | PrimaryExpr "[" SliceList "]" -- slicing
-    | PrimaryExpr "(" (ArgList | Comprehension)? ")" -- call
+    | PrimaryExpr "[" ExprList "]" -- subscription
+    | PrimaryExpr "(" (Comprehension | ArgList)? ")" -- call
     | Atom
   
-  Atom = "(" (StarredExpr)? ")" -- tuple
-    | "[" (StarredList | Comprehension)? "]" -- list
-    | "{" (StarredList | Comprehension) "}" -- set
-    | "{" (KeyDatumList | DictComprehension)? "}" -- dict
+  Atom = 
+    | "(" (StarredExpr)? ")" -- tuple
+    | "[" (Comprehension | StarredList)? "]" -- list
+    | "{" (Comprehension | StarredList) "}" -- set
+    | "{" (DictComprehension | KeyDatumList)? "}" -- dict
     | "(" Expr CompIter_for ")"-- generator
     | "(" YieldExpr ")" -- yield
     | identifier -- identifier
@@ -145,15 +178,17 @@ Python {
     | false -- false
 
   YieldExpr = yield YieldArg?
-  YieldArg = from Expr -- from
+  YieldArg = 
+    | from Expr -- from
     | ExprList -- args
   
   SliceList = NonemptyListWithOptionalEndSep<Slice, ",">
-  Slice = Expr -- single
+  Slice = 
     | Expr? ":" Expr? Sliceop? -- slice
+    | Expr -- single
   Sliceop = ":" Expr?
 
-  ArgList = PositionalArguments ("," KeywordsArguments)? ","?
+  ArgList = PositionalArguments ("," StarredAndKeywordsArguments)? ("," KeywordsArguments)? ","?
 
   Argument = Expr -- positional
     | "*" Expr -- singleStar
@@ -161,11 +196,11 @@ Python {
     | "**" Expr -- doubleStar
   
   PositionalArgument = Argument_positional | Argument_singleStar
-  StarredOrKeywordArgument = Argument_singleStar | Argument_keyword
+  StarredAndKeywordsArgument = Argument_singleStar | Argument_keyword
   KeywordsArgument = Argument_keyword | Argument_doubleStar
   
-  PositionalArguments = NonemptyListOf<PositionalArgument, ",">
-  StarredOrKeywordArguments = NonemptyListOf<StarredOrKeywordArgument, ",">
+  PositionalArguments = NonemptyListOf<~(Argument_keyword) PositionalArgument, ",">
+  StarredAndKeywordsArguments = NonemptyListOf<StarredAndKeywordsArgument, ",">
   KeywordsArguments = NonemptyListOf<KeywordsArgument, ",">
 
   TargetList = NonemptyListWithOptionalEndSep<Target, ",">
@@ -186,10 +221,10 @@ Python {
   KeyDatumList = NonemptyListWithOptionalEndSep<KeyDatum, ",">
   KeyDatum = Expr ":" Expr -- keyValue
     | "**" Expr -- doublestar
-
+    
   DictComprehension = KeyDatum_keyValue CompIter_for
   Comprehension = Expr CompIter_for 
-  CompIter = async? for ExprList in OrTest CompIter? -- for
+  CompIter = async? for ExprList_withoutEndingIn in OrTest CompIter? -- for
     | if Expr_nocond CompIter? -- if
   
   newline = "\\n"
@@ -200,7 +235,7 @@ Python {
   dedent = "⇦"
   comment = "#" (~"\\n" any)*
   
-  identifier = id_start id_continue*
+  identifier = ~keyword id_start id_continue*
   id_start = "_"
   	| "a".."z"
     | "A".."Z"
@@ -213,11 +248,12 @@ Python {
     | floating_point
     | integer
   
-  integer = nonzerodigit ("_"? digit)* -- nonzerodecimal
-    | "0"+ ("_"? "0")* -- zero
+  integer = 
     | "0" ("b" | "B") ("_"? bindigit)+ -- binary
     | "0" ("o" | "O") ("_"? octdigit)+ -- octal
     | "0" ("x" | "X") ("_"? hexdigit)+ -- hex
+    | nonzerodigit ("_"? digit)* -- nonzerodecimal
+    | "0"+ ("_"? "0")* -- zero
   nonzerodigit = "1".."9"
   bindigit = "0" | "1"
   octdigit = "0".."7"
@@ -235,20 +271,20 @@ Python {
   
   string = stringliteral | bytesliteral
   
-  stringliteral = stringprefix? (shortstring | longstring)
-  stringprefix = "r" | "u" | "R" | "U" | "f" | "F" | "fr" | "Fr" | "fR" | "FR" | "rf" | "rF" | "Rf" | "RF"
+  stringliteral = stringprefix? (longstring | shortstring)
+  stringprefix = "fr" | "Fr" | "fR" | "FR" | "rf" | "rF" | "Rf" | "RF" | "r" | "u" | "R" | "U" | "f" | "F" 
   shortstring = "'" shortstringitem<"'">* "'" | "\\"" shortstringitem<"\\"">* "\\""
-  longstring = "'''" longstringitem* "'''" | "\\"\\"\\"" longstringitem* "\\"\\"\\""
+  longstring = "'''" (~"'''" longstringitem)* "'''" | "\\"\\"\\"" (~"\\"\\"\\"" longstringitem)* "\\"\\"\\""
   shortstringitem<quote> = shortstringchar<quote> | stringescapeseq
   longstringitem = longstringchar | stringescapeseq
   shortstringchar<quote> = ~(quote|newline|"\\\\") any
   longstringchar = ~"\\\\" any
   stringescapeseq = "\\\\" any
   
-  bytesliteral = bytesprefix (shortbytes | longbytes)
-  bytesprefix = "b" | "B" | "br" | "Br" | "bR" | "BR" | "rb" | "rB" | "Rb" | "RB"
+  bytesliteral = bytesprefix (longbytes | shortbytes)
+  bytesprefix = "br" | "Br" | "bR" | "BR" | "rb" | "rB" | "Rb" | "RB" | "b" | "B" 
   shortbytes = "'" shortbytesitem<"'">* "'" | "\\"" shortbytesitem<"\\"">* "\\""
-  longbytes = "'''" longbytesitem* "'''" | "\\"\\"\\"" longbytesitem* "\\"\\"\\""
+  longbytes = "'''" (~"'''" longbytesitem)* "'''" | "\\"\\"\\"" (~"\\"\\"\\"" longbytesitem)* "\\"\\"\\""
   shortbytesitem<quote> = shortbyteschar<quote> | bytesescapeseq
   longbytesitem = longbyteschar | bytesescapeseq
   shortbyteschar<quote> = ~("\\\\" | newline | quote) ascii
@@ -257,8 +293,8 @@ Python {
  
   ascii = "\\u0000".."\\u007F"
   
-  async = "async"
-  await = "await"
+  async = "async" ~id_continue
+  await = "await" ~id_continue
   
   false = "False" ~id_continue
   class = "class" ~id_continue
@@ -299,18 +335,24 @@ Python {
   except = "except" ~id_continue
   in = "in" ~id_continue
   raise = "raise" ~id_continue
+
+  keyword
+    = false | none | true | and | as | assert | break | class | continue | def | del | elif | else | except
+    | finally | for | from | global | if | import | in | is | lambda | nonlocal | not | or | pass | raise
+    | return | try | while | with | yield
   
-  comp_op = "<" -- lt
-    | ">" -- gt
+  comp_op = 
     | "==" -- eq
     | ">=" -- ge
     | "<=" -- le
     | "<>" -- lg
+    | "<" -- lt
+    | ">" -- gt
     | "!=" -- neq
+    | not space* in -- notin
     | in -- in
-    | not in -- notin
+    | is space* not -- isnot
     | is -- is
-    | is not -- isnot
   augassign = "+=" | "-=" | "*=" | "@=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "**=" | "//="
   
   NonemptyListWithOptionalEndSep<elem, sep> = NonemptyListOf<elem, sep> sep?

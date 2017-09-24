@@ -27,6 +27,7 @@ class Preprocessor {
     this.lexer.setInput(code);
     let token;
     while (token = this.lexer.lex()) {
+      this.state.lastToken = token;
       ans.add(token);
     }
 

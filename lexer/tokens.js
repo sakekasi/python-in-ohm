@@ -209,7 +209,12 @@ BlankLine.regex = /\n([ \t\u00A0]*)(#.*(?=(\n|$)))?(?=\n)/u;
 
 class EOF extends Token{
   static create(state) {
-    const ans = [new NewLine(state.origIdx, state.origIdx)];
+    let ans;
+    if (!(state.lastToken instanceof NewLine)) {
+      ans = [new NewLine(state.origIdx, state.origIdx)];
+    } else {
+      ans = [];
+    }
     while (state.indentationStack.length > 1) {
       ans.push(new Dedent(state.indentationStack.join('').length, state.origIdx, state.origIdx));
       state.indentationStack.pop();
