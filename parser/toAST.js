@@ -1,6 +1,7 @@
 semantics.addOperation('toAST(sourceMap)', {
   Program(newlinesAndStmts, _) {
     const sourceMap = this.args.sourceMap;
+    if (sourceMap === undefined) debugger;
     return new Program(this.sourceLoc(sourceMap),
       flattenAndFilterNulls(newlinesAndStmts.toAST(sourceMap)));
   },
@@ -160,9 +161,20 @@ semantics.addOperation('toAST(sourceMap)', {
       positional.map(i => i.default), rest.defaults);
   },
 
+  Parameter_normal(identCst, _, optAnnCst) {
+    const sourceMap = this.args.sourceMap;
+    const ann = optAnnCst.numChildren === 1 ? optAnnCst.toAST(sourceMap) : null;
+    return new Arg(this.sourceLoc(sourceMap), identCst.sourceString, ann);
+  },
+
+  Parameter_noann(identCst) {
+    const sourceMap = this.args.sourceMap;
+    return new Arg(this.sourceLoc(sourceMap), identCst.sourceString, null);
+  },
+
   DefParameter(paramCst, _, optDefaultCst) {
     const sourceMap = this.args.sourceMap;
-    const param = paramCst.toAST(sourceMap); // TODO: parameter
+    const param = paramCst.toAST(sourceMap);
     const default_ = optDefaultCst.numChildren === 1 ? optDefaultCst.toAST(sourceMap) : null;
     return {param, default: default_};
   },
@@ -208,17 +220,62 @@ semantics.addOperation('toAST(sourceMap)', {
     return new UnaryOp(this.sourceLoc(sourceMap), 'not', expr);
   },
 
-  Comparison(leftCst, opCsts, rightCsts) {
+  Comparison_default(leftCst, rest) {
     const sourceMap = this.args.sourceMap;
     const left = leftCst.toAST(sourceMap);
-    const ops = opCsts.toAST(sourceMap);
-    const rights = rightCsts.toAST(sourceMap);
+    const [ops, rights] = rest.toAST(sourceMap);
 
     if (ops.length === 0) {
       return left;
     } else {
       return new Compare(this.sourceLoc(sourceMap), left, ops, rights);
     }
+  },
+
+  Comparison_withoutEndingIn(leftCst, rest) {
+    const sourceMap = this.args.sourceMap;
+    const left = leftCst.toAST(sourceMap);
+    const [ops, rights] = rest.toAST(sourceMap);
+
+    if (ops.length === 0) {
+      return left;
+    } else {
+      return new Compare(this.sourceLoc(sourceMap), left, ops, rights);
+    }
+  },
+
+  ComparisonRest_default(opCsts, rightCsts) {
+    const sourceMap = this.args.sourceMap;
+    const ops = opCsts.toAST(sourceMap);
+    const rights = rightCsts.toAST(sourceMap);
+    return [ops, rights];
+  },
+
+  ComparisonRest_withoutEndingIn(compRestItems) {
+    const sourceMap = this.args.sourceMap;
+    const ops = [];
+    const rights = [];
+    const items = compRestItems.toAST(sourceMap);
+    items.forEach(([op, right]) => {
+      ops.push(op);
+      rights.push(right);
+    });
+
+    return [ops, rights];
+  },
+
+  ComparisonRestItemWithoutEndingIn_in(opCst, rightCst, _, __) {
+    const sourceMap = this.args.sourceMap;
+    const op = opCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return [op, right];
+  },
+
+  ComparisonRestItemWithoutEndingIn_default(opCst, rightCst) {
+    const sourceMap = this.args.sourceMap;
+    const op = opCst.toAST(sourceMap);
+    const right = rightCst.toAST(sourceMap);
+    return [op, right];
   },
 
   StarredExpr_star(starredItemList) {
@@ -437,13 +494,21 @@ semantics.addOperation('toAST(sourceMap)', {
     return new Keyword(this.sourceLoc(sourceMap), null, expr);
   }, // TODO context Param
 
-  ArgList(positionalArguments, _, optKeywordsArguments, __) {
+  ArgList(positionalArguments, _, optStarredAndKeywordsArguments, __, optKeywordsArguments, ___) {
     const sourceMap = this.args.sourceMap;
     const positional = positionalArguments.toAST(sourceMap);
-    let keyword = optKeywordsArguments.toAST(sourceMap);
-    if (keyword.length > 0) {
-      keyword = keyword[0];
-    }
+    let keyword = optKeywordsArguments.numChildren === 1 ?
+      optKeywordsArguments.toAST(sourceMap)[0]: [];
+
+    const starredAndKeywords = optStarredAndKeywordsArguments.numChildren === 1 ?
+      optStarredAndKeywordsArguments.toAST(sourceMap)[0]: [];
+    starredAndKeywords
+      .filter(item => item instanceof Starred)
+      .forEach(starred => positional.push(starred));
+    keyword = starredAndKeywords
+      .filter(item => item instanceof Keyword)
+      .concat(keyword);
+
     return {positional, keyword};
   },
 

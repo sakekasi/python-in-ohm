@@ -42,9 +42,9 @@ Python {
     | try Suite (except (Expr (as identifier)?)? Suite)+ (else Suite)? (finally Suite)? -- tryWithExcept
     | try Suite finally Suite -- tryWithoutExcept
     | with NonemptyListOf<WithItem, ","> Suite -- with
-    | Decorator* def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- funcdef
+    | Decorator* def identifier "(" ParameterListWithAnn? ")" ("->" Expr)? Suite -- funcdef
     | Decorator* class identifier ("(" ArgList? ")")? Suite -- classdef
-    | Decorator* async def identifier "(" ParameterList? ")" ("->" Expr)? Suite -- asyncFuncDef
+    | Decorator* async def identifier "(" ParameterListWithAnn? ")" ("->" Expr)? Suite -- asyncFuncDef
     | async CompoundStmt_with -- asyncWith
     | async CompoundStmt_for -- asyncFor
   
@@ -55,12 +55,16 @@ Python {
   Decorator = "@" DottedName ("(" (ArgList ","?)? ")")? newline
   DottedName = NonemptyListOf<identifier, ".">
   
-  ParameterList = NonemptyListOf<DefParameter, ","> ("," ParameterListStarArgs?)? -- normal
-    | ParameterListStarArgs
-  ParameterListStarArgs = "*" Parameter? ("," DefParameter)* ("," ("**" Parameter ","?)?)? -- argsAndKwargs
-    | "**" Parameter ","? -- kwargs
-  Parameter = identifier (":" Expr)?
-  DefParameter = Parameter ("=" Expr)?
+  ParameterListWithoutAnn = ParameterList<Parameter_noann>
+  ParameterListWithAnn = ParameterList<Parameter_normal>
+
+  ParameterList<Param> = NonemptyListOf<DefParameter<Param>, ","> ("," ParameterListStarArgs<Param>?)? -- normal
+    | ParameterListStarArgs<Param>
+  ParameterListStarArgs<Param> = "*" Param? ("," DefParameter<Param>)* ("," ("**" Param ","?)?)? -- argsAndKwargs
+    | "**" Param ","? -- kwargs
+  Parameter = identifier (":" Expr)? -- normal
+    | identifier -- noann
+  DefParameter<Param> = Param ("=" Expr)?
 
   ExprList = NonemptyListWithOptionalEndSep<Expr, ",">
 
@@ -81,14 +85,14 @@ Python {
   StarredItem = "*" OrExpr -- star
     | Expr
 
-  Expr = lambda ParameterList? ":" Expr -- lambda
+  Expr = lambda ParameterListWithoutAnn? ":" Expr -- lambda
     | OrTest (if OrTest else Expr)? -- cond
 
-  Expr_nocond = lambda ParameterList? ":" Expr_nocond -- lambda
+  Expr_nocond = lambda ParameterListWithoutAnn? ":" Expr_nocond -- lambda
     | OrTest
   
   Expr_withoutEndingIn =
-    | lambda ParameterList? ":" Expr_withoutEndingIn -- lambda
+    | lambda ParameterListWithoutAnn? ":" Expr_withoutEndingIn -- lambda
     | OrTest if OrTest else Expr_withoutEndingIn -- cond
     | OrTest_withoutEndingIn
 

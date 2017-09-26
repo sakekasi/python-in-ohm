@@ -62,6 +62,11 @@ class TokenStream {
       }
     });
 
+    // map the position just after the end of the preprocessed text to 
+    // the position just after the end of the original text
+    map.mapSingle(this.input.length, 
+      code.length, code.length + 1);
+
     map.new = code;
 
     this._output = {code, map};

@@ -6,5 +6,7 @@ AST.prototype.verify = function(code) {
   console.log(code.substring(this.sourceLoc.startIdx, this.sourceLoc.endIdx));
   console.log('\n');
 
-  this.children.forEach(child => child.verify(code));
+  this.children
+    .filter(child => child !== null)
+    .forEach(child => child.verify(code));
 };

@@ -977,6 +977,11 @@ def __new__(a, b, c):
   
   'Expr_lambda': [
     {
+      name: 'lambda x, y: x + y, [1,2,3,4], 0: 4 : pass',
+      code: 'lambda x, y: x + y, [1,2,3,4], 0: 4 : pass',
+      succeed: false
+    },
+    {
       name: 'lambda: 42',
       code: 'lambda: 42',
     },
@@ -1401,6 +1406,10 @@ def __new__(a, b, c):
   ],
 
   'PrimaryExpr_call': [
+    {
+      name: 'reduce(lambda x, y: x + y, [1,2,3,4], 0)',
+      code: 'reduce(lambda x, y: x + y, [1,2,3,4], 0)',
+    },
     {
       name: 'foo(a, *b, k = v, **d)',
       code: 'foo(a, *b, k = v, **d)',

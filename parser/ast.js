@@ -940,6 +940,14 @@ class Arg extends AST {
   get children() {
     return [this.annotation];
   }
+
+  toString() {
+    let ans = this.arg;
+    if (this.annotation) {
+      ans += ' : ' + this.annotation.toString();
+    }
+    return ans;
+  }
 }
 
 class Return extends Stmt {
