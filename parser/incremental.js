@@ -1,31 +1,29 @@
 class IncrementalInstrumenter {
   constructor() {
-    this.code = '';
-    this.preprocessedCode = '';
-    this.preprocessedMap = new SourceMap('');
-    this.preprocessedMap.origToNew[0] = 0;
-    this.preprocessedMap.newToOrig[0] = 0;
+    this.code = null;
+    this.tokenStream = null;
     this.matcher = pythonGrammar.matcher();
     this.preprocessor = new Preprocessor();
   }
 
   replaceInputRange(fromIdx, toIdx, insertedText) {
-    const preprocessedFromIdx = this.preprocessedMap.newIdx(fromIdx);
-    const preprocessedToIdx = this.preprocessedMap.newIdx(toIdx);
-
-    this.code = this.code.slice(0, fromIdx) + insertedText + this.code.slice(toIdx);
-    ({code: this.preprocessedCode, map: this.preprocessedMap} = this.preprocessor.preprocess(this.code));
-
-    const preprocessedInsertedText = this.preprocessedCode.slice(
-      this.preprocessedMap.newIdx(fromIdx), 
-      this.preprocessedMap.newIdx(fromIdx + insertedText.length)
-    );
-
-    if (preprocessedInsertedText.length === 0 && preprocessedFromIdx === preprocessedToIdx) {
-      return;
+    if (this.code === null) {
+      this.code = insertedText;
+      this.tokenStream = this.preprocessor.lex(this.code);
+      const diffs = [{from: fromIdx, to: toIdx, text: insertedText}];
+      diffs.forEach(({from, to, text}) => {
+        this.matcher.replaceInputRange(from, to, text);
+      });
+    } else {
+      const newCode = this.code.slice(0, fromIdx) + insertedText + this.code.slice(toIdx);
+      const newTokenStream = this.preprocessor.lex(newCode);
+      const diffs = this.tokenStream.diff(newTokenStream);
+      diffs.forEach(({from, to, text}) => {
+        this.matcher.replaceInputRange(from, to, text);
+      });
+      this.code = newCode;
+      this.tokenStream = newTokenStream;
     }
-
-    this.matcher.replaceInputRange(preprocessedFromIdx, preprocessedToIdx, preprocessedInsertedText);
   }
 
   instrument() {
