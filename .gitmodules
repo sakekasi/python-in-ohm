@@ -1,3 +1,0 @@
-[submodule "third_party/diff.js"]
-	path = third_party/diff.js
-	url = git@github.com:Slava/diff.js.git
