@@ -93,40 +93,17 @@ class TokenStream {
     return ans;
   }
 
-  splice(from, to, start, end, other) {
-    let f = from.idx;
-    let ct = to.idx - from.idx;
-
-    // splice to combined with end
-    if (to.type === 'inside') {
-      ct++;
-    }
-
-    // tokens with index [s,e) can be inserted unmodified
-    const s = from.type === 'inside' && start.type === 'inside' ? start.idx + 1 : start.idx;
-    const e = end.idx;
-    const insert = other.slice(s, e);
-
-    if (from.type === 'inside' && start.type === 'inside') {
-      const combinedTokens = [];
-      const fromToken = this.get(from);
-      const startToken = other.get(start);
-      const combinedString = this.input.slice(fromToken.startIdx, fromToken.startIdx + from.offset) +
-        other.input.slice(startToken.startIdx + start.offset, startToken.endIdx);
-      // insert.unshift(combine left of from, right of start); // TODO
-    }
-
-    if (to.type === 'inside' && end.type === 'inside') {
-      // insert.push(combine left of end and right of to); // TODO
-    }
-
-    this.tokens.splice(f, ct, ...insert);
-  }
-
   diff(other) {
     this.output;
     other.output;
     const diffOps = diff(this.tokens, other.tokens, (i, j) => i.equals(j));
+    diffOps.forEach(item => {
+      if (this.tokens.includes(item.atom)) {
+        item.from = 'this';
+      } else {
+        item.from = 'other';
+      }
+    })
     // cluster into add + delete
     const diffObjs = [];
     let currentDiffObj = null;
@@ -134,8 +111,18 @@ class TokenStream {
     let lastEndIdx = 0;
     let lastUnchangedToken = null;
     diffOps.forEach(op => {
-      if (op.operation === 'none') {
+      switch (op.operation) {
+      case 'add':
+        currentAdds.push(op.atom);
+      case 'delete':
+        if (currentDiffObj === null) {
+          currentDiffObj = Object.create(null);
+          currentDiffObj.from = lastUnchangedToken !== null ? lastUnchangedToken.newEndIdx : 0;
+        }
+        break;
+      case 'none':
         if (currentDiffObj !== null) {
+          // a none after a diff means we close the current diff obj
           currentDiffObj.to = op.atom.newStartIdx;
 
           // get string value from other
@@ -143,7 +130,8 @@ class TokenStream {
           let endToken = currentAdds.reduce((agg, b) => agg && agg.tokenIdx > b.tokenIdx ? agg : b, null);
           if (startToken === null) {
             currentDiffObj.text = '';
-            if (!(endToken instanceof NewLine) || !(lastUnchangedToken instanceof NewLine)) {
+            if (endToken && !(endToken instanceof NewLine) || 
+              lastUnchangedToken && !(lastUnchangedToken instanceof NewLine)) {
               currentDiffObj.text += ' ';
             }
           } else {
@@ -151,10 +139,10 @@ class TokenStream {
               startToken.newStartIdx,
               endToken.newEndIdx
             );
-            if (!(endToken instanceof NewLine)) {
+            if (endToken && !(endToken instanceof NewLine)) {
               currentDiffObj.text += ' ';
             }
-            if (!(lastUnchangedToken instanceof NewLine)) {
+            if (lastUnchangedToken && !(lastUnchangedToken instanceof NewLine)) {
               currentDiffObj.text = ' ' + currentDiffObj.text;
             }
           }
@@ -166,15 +154,7 @@ class TokenStream {
           currentAdds = [];
         }
         lastUnchangedToken = op.atom;
-      } else {
-        if (currentDiffObj === null) {
-          currentDiffObj = Object.create(null);
-          currentDiffObj.from = lastUnchangedToken !== null ? lastUnchangedToken.newEndIdx : 0 ;
-        }
-
-        if (op.operation === 'add') {
-          currentAdds.push(op.atom);
-        }
+        break;
       }
     });
     
@@ -185,15 +165,19 @@ class TokenStream {
       let endToken = currentAdds.reduce((agg, b) => agg && agg.tokenIdx > b.tokenIdx ? agg : b, null);
       if (startToken === null) {
         currentDiffObj.text = '';
-        if (!(lastUnchangedToken instanceof NewLine)) {
+        if (endToken && !(endToken instanceof NewLine) || 
+          lastUnchangedToken && !(lastUnchangedToken instanceof NewLine)) {
           currentDiffObj.text += ' ';
         }
       } else {
         currentDiffObj.text = other.output.code.slice(
-          other.output.map.newIdx(startToken.startIdx),
-          other.output.map.newIdx(endToken.endIdx)
+          startToken.newStartIdx,
+          endToken.newEndIdx
         );
-        if (!(lastUnchangedToken instanceof NewLine)) {
+        if (endToken && !(endToken instanceof NewLine)) {
+          currentDiffObj.text += ' ';
+        }
+        if (lastUnchangedToken && !(lastUnchangedToken instanceof NewLine)) {
           currentDiffObj.text = ' ' + currentDiffObj.text;
         }
       }

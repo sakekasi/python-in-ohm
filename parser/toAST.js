@@ -133,11 +133,15 @@ semantics.addOperation('toAST(sourceMap)', {
     const args = optArgCst.children.length === 1 ? optArgCst.toAST(sourceMap)[0][0] : null;
     const body = bodyCst.toAST(sourceMap);
     
-    console.assert(!args.positional.some(arg => arg instanceof Starred));
-    console.assert(!args.keyword.some(arg => arg instanceof Keyword && arg.arg === null));
+    if (args) {
+      console.assert(!args.positional.some(arg => arg instanceof Starred));
+      console.assert(!args.keyword.some(arg => arg instanceof Keyword && arg.arg === null));
+    }
 
 
-    return new ClassDef(this.sourceLoc(sourceMap), name, args.positional, args.keyword, body, decorators);
+    return new ClassDef(this.sourceLoc(sourceMap), name, 
+      args? args.positional : [] , 
+      args? args.keyword : [] , body, decorators);
   },
 
   Suite_single(_, stmtCst, __) {

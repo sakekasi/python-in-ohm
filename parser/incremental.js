@@ -7,30 +7,40 @@ class IncrementalInstrumenter {
   }
 
   replaceInputRange(fromIdx, toIdx, insertedText) {
+    let newCode, newTokenStream;
     if (this.code === null) {
-      this.code = insertedText;
-      this.tokenStream = this.preprocessor.lex(this.code);
-      const diffs = [{from: fromIdx, to: toIdx, text: insertedText}];
+      newCode = insertedText;
+      newTokenStream = this.preprocessor.lex(this.code);
+      const diffs = [{from: fromIdx, to: toIdx, text: this.tokenStream.output.code}];
       diffs.forEach(({from, to, text}) => {
         this.matcher.replaceInputRange(from, to, text);
       });
     } else {
-      const newCode = this.code.slice(0, fromIdx) + insertedText + this.code.slice(toIdx);
-      const newTokenStream = this.preprocessor.lex(newCode);
+      newCode = this.code.slice(0, fromIdx) + insertedText + this.code.slice(toIdx);
+      newTokenStream = this.preprocessor.lex(newCode);
       const diffs = this.tokenStream.diff(newTokenStream);
-      diffs.forEach(({from, to, text}) => {
+      diffs.forEach(({from, to, text}, idx) => {
         this.matcher.replaceInputRange(from, to, text);
+        const oldLength = to - from;
+        const newLength = text.length;
+        diffs.forEach((diff, j) => {
+          if (j > idx) {
+            diff.from += newLength - oldLength;
+            diff.to += newLength - oldLength;
+          }
+        });
       });
-      this.code = newCode;
-      this.tokenStream = newTokenStream;
     }
+    console.assert(this.matcher.input === newTokenStream.output.code);
+    this.code = newCode;
+    this.tokenStream = newTokenStream;
   }
 
   instrument() {
     const result = this.matcher.match();
     if (result.succeeded()) {
       try {
-        const ast = semantics(result).toAST(this.preprocessedMap);
+        const ast = semantics(result).toAST(this.tokenStream.output.map);
         const instrumented = ast.instrumented(new InstrumenterState());
         return instrumented.toString();
       } catch (parseError) {
