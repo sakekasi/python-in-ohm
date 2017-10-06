@@ -4,19 +4,25 @@ class IncrementalInstrumenter {
     this.tokenStream = null;
     this.matcher = pythonGrammar.matcher();
     this.preprocessor = new Preprocessor();
+    this.cstNodeIds = new WeakMap();
+    this.nextCstNodeId = 0;
   }
 
   replaceInputRange(fromIdx, toIdx, insertedText) {
     let newCode, newTokenStream;
     if (this.code === null) {
       newCode = insertedText;
-      newTokenStream = this.preprocessor.lex(this.code);
-      const diffs = [{from: fromIdx, to: toIdx, text: this.tokenStream.output.code}];
+      this.code = newCode;
+      SourceLoc.setupCodeMap(this.code);
+      newTokenStream = this.preprocessor.lex(newCode);
+      const diffs = [{from: fromIdx, to: toIdx, text: newTokenStream.output.code}];
       diffs.forEach(({from, to, text}) => {
         this.matcher.replaceInputRange(from, to, text);
       });
     } else {
       newCode = this.code.slice(0, fromIdx) + insertedText + this.code.slice(toIdx);
+      this.code = newCode;
+      SourceLoc.setupCodeMap(this.code);
       newTokenStream = this.preprocessor.lex(newCode);
       const diffs = this.tokenStream.diff(newTokenStream);
       diffs.forEach(({from, to, text}, idx) => {
@@ -32,26 +38,32 @@ class IncrementalInstrumenter {
       });
     }
     console.assert(this.matcher.input === newTokenStream.output.code);
-    this.code = newCode;
+    // this.code = newCode;
     this.tokenStream = newTokenStream;
   }
 
   instrument() {
     const result = this.matcher.match();
     if (result.succeeded()) {
-      try {
-        const ast = semantics(result).toAST(this.tokenStream.output.map);
-        const instrumented = ast.instrumented(new InstrumenterState());
-        return instrumented.toString();
-      } catch (parseError) {
-        // TODO: handle parse error with linenos
-        console.error(parseError);
-        throw new Error('TODO: handle parse error');
-      }
+      const ast = semantics(result).toAST(this.tokenStream.output.map, this);
+      const instrumented = ast.instrumented(new InstrumenterState());
+      return instrumented.toString();
     } else {
-      // TODO: handle parse error with linenos
-      console.log(result.message);
-      throw new Error('TODO: handle parse error');
+      throw new ParseError(
+        this.tokenStream.output.map.originalIdx(result.getRightmostFailurePosition()),
+        result.getExpectedText()
+      );
+    }
+  }
+
+  id(cstNode) {
+    if (this.cstNodeIds.has(cstNode)) {
+      console.log('existing cst node');
+      return this.cstNodeIds.get(cstNode);
+    } else {
+      const id = this.nextCstNodeId++;
+      this.cstNodeIds.set(cstNode, id);
+      return id;
     }
   }
 }

@@ -12,6 +12,13 @@ class SourceLoc {
     return SourceLoc.codeMap[this.endIdx - 1];
   }
 
+  get startPos() { return this.startIdx; }
+  get endPos() { return this.endIdx; }
+
+  get contents() {
+    return SourceLoc.code.slice(this.startIdx, this.endIdx);
+  }
+
   equals(sourceLoc) {
     return this.startIdx === sourceLoc.startIdx && this.endIdx === sourceLoc.endIdx;
   }
@@ -41,7 +48,13 @@ class SourceLoc {
     );
   }
 
+  trimmed() {
+    const trimmedContents = trimRight(this.contents);
+    return new SourceLoc(this.startIdx, this.endIdx - (this.contents.length - trimmedContents.length));
+  }
+
   static setupCodeMap(code) {
+    SourceLoc.code = code;
     SourceLoc.codeMap = {};
     let lineNumber = 1;
     range(0, code.length-1).forEach(i => {

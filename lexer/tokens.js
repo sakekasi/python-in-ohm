@@ -97,7 +97,7 @@ class Delimiter extends Token {
     case '}':
       const matchingOpen = state.parenStack.pop();
       if (!(matchingOpen && matches(matchingOpen, value))) {
-        throw new Error('parens dont match');
+        throw new ParensError(state.origIdx, `^\nparens don't match`);
       }
       break;
     }
@@ -110,7 +110,7 @@ function matches(open, close) {
   case '(': return close === ')';
   case '[': return close === ']';
   case '{': return close === '}';
-  default: throw new Error(`can't match ${open} and ${close}`);
+  default: throw new ParensError(state.origIdx, `^\ncan't match ${open} and ${close}`);
   }
 }
 
@@ -172,11 +172,11 @@ class NewLine extends Token {
       if (currentIndentationLevel === lastIndentationLevel) {
         state.getRange(currentIndentation);
         if (currentIndentation !== lastIndentation) {
-          throw new Error('indentation error');
+          throw new IndentationError(state.origIdx);
         }
       } else if (currentIndentationLevel > lastIndentationLevel) {
         if (currentIndentation.slice(0, lastIndentationLevel) !== lastIndentation) {
-          throw new Error('indentation error');
+          throw new IndentationError(state.origIdx);
         }
         state.indentationStack.push(currentIndentation.slice(lastIndentationLevel));
         ans.push(new Indent(currentIndentationLevel, state.origIdx, state.origIdx + 1)); // TODO: this is suspect
@@ -188,10 +188,10 @@ class NewLine extends Token {
           lastIndentation = state.indentationStack.join('');
           lastIndentationLevel = lastIndentation.length;
         }
-        if (lastIndentationLevel !== currentIndentationLevel || lastIndentation !== currentIndentation) {
-          throw new Error('indentation error');
-        }
         state.getRange(currentIndentation);
+        if (lastIndentationLevel !== currentIndentationLevel || lastIndentation !== currentIndentation) {
+          throw new IndentationError(state.origIdx);
+        }
       }
       state.explicitLineJoin = false;
       return ans;

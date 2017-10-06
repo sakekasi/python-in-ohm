@@ -12,7 +12,8 @@ Python {
     | AugTarget augassign (ExprList | YieldExpr) -- augassign
     | AugTarget ":" Expr ("=" Expr)? -- annassign
     | pass -- pass
-    | del ExprList -- del
+    // used to be ExprList
+    | del TargetList -- del
     | return ExprList? -- return
     | YieldExpr -- yield
     | ImportStmt
@@ -168,11 +169,11 @@ Python {
     | Atom
   
   Atom = 
-    | "(" (StarredExpr)? ")" -- tuple
+    | "(" StarredExpr? ")" -- tuple
     | "[" (Comprehension | StarredList)? "]" -- list
     | "{" (Comprehension | StarredList) "}" -- set
     | "{" (DictComprehension | KeyDatumList)? "}" -- dict
-    | "(" Expr CompIter_for ")"-- generator
+    | "(" Expr CompIter_for ")" -- generator
     | "(" YieldExpr ")" -- yield
     | identifier -- identifier
     | literal -- literal
@@ -208,13 +209,15 @@ Python {
   KeywordsArguments = NonemptyListOf<KeywordsArgument, ",">
 
   TargetList = NonemptyListWithOptionalEndSep<Target, ",">
+  TargetInternalList = NonemptyListWithOptionalEndSep<TargetInternal, ",">
+  TargetInternal = Target
+    | "*" Target -- star
   Target = 
-    | "(" TargetList? ")" -- tuple
-    | "[" TargetList? "]" -- list
+    | "(" TargetInternalList? ")" -- tuple
+    | "[" TargetInternalList? "]" -- list
     | PrimaryExpr_attributeref -- attributeref
     | PrimaryExpr_subscription -- subscription
     | PrimaryExpr_slicing -- slicing
-    | "*" Target -- star
     | identifier -- identifier
   
   AugTarget = Target_attributeref
@@ -228,7 +231,8 @@ Python {
     
   DictComprehension = KeyDatum_keyValue CompIter_for
   Comprehension = Expr CompIter_for 
-  CompIter = async? for ExprList_withoutEndingIn in OrTest CompIter? -- for
+  // ExprList_withoutEndingIn
+  CompIter = async? for TargetList in OrTest CompIter? -- for
     | if Expr_nocond CompIter? -- if
   
   newline = "\\n"

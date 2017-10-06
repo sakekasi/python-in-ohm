@@ -24,7 +24,7 @@ Program.prototype.instrumented = function(state) {
 
   const defn = def('runCode', null, stmts, [], null, null)
   state.parents.pop();
-  return program([defn], this.sourceLoc);
+  return program([defn], this.sourceLoc, this.id);
 };
 
 // Literal
@@ -51,11 +51,11 @@ List.prototype.instrumented = function(state) {
   state.parents.push(this);
 
   state.parents.pop();
-  return new List(this.sourceLoc, this.elts.map(elt => elt.instrumented(state)));
+  return new List(this.sourceLoc, this.id, this.elts.map(elt => elt.instrumented(state)));
 };
 
 Tuple.prototype.instrumented = function(state) {
-  return new Tuple(this.sourceLoc, this.elts.map(elt => elt.instrumented(state)), this.ctx);
+  return new Tuple(this.sourceLoc, this.id, this.elts.map(elt => elt.instrumented(state)), this.ctx);
 };
 
 // Variables
@@ -78,7 +78,7 @@ BinOp.prototype.instrumented = function(state) {
   state.parents.push(this);
 
   state.parents.pop();
-  return new BinOp(this.sourceLoc, this.left.instrumented(state), this.op, this.right.instrumented(state));
+  return new BinOp(this.sourceLoc, this.id, this.left.instrumented(state), this.op, this.right.instrumented(state));
 };
 
 Compare.prototype.instrumented = function(state) {
@@ -86,7 +86,7 @@ Compare.prototype.instrumented = function(state) {
   state.parents.push(this);
 
   state.parents.pop();
-  return new Compare(this.sourceLoc, this.left.instrumented(state), this.ops, 
+  return new Compare(this.sourceLoc, this.id, this.left.instrumented(state), this.ops, 
     this.comparators.map(comparator => comparator.instrumented(state)));
 };
 
@@ -106,8 +106,7 @@ Call.prototype.instrumented = function(state) {
   // R.memoize(<id>_args, args)
   elts.push(call(dot(id('R'), 'memoize'), [str(this.id + '_args'), 
     list(this.args.map(arg => arg.instrumented(state)))], []));
-  // R.send(orderNum, this.sourceLoc, __currentEnv__, R.retrieve(<id>_func), selector, R.retrieve(<id>_args), None)
-  // TODO: activationToken
+  // R.send(orderNum, this.sourceLoc, __currentEnv__, R.retrieve(<id>_func), selector, R.retrieve(<id>_args), this.id)
   // TODO: keyword arguments in recorder
   elts.push(call(dot(id('R'), 'send'), [n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'),
     call(dot(id('R'), 'retrieve'), [str(this.id + '_func')], []), str(selector), 
@@ -116,14 +115,14 @@ Call.prototype.instrumented = function(state) {
   elts.push(call(dot(id('R'), 'receive'), [
     id('__currentEnv__'), call(
       call(dot(id('R'), 'retrieve'), [str(this.id + '_func')], []), 
-      [star(call(dot(id('R'), 'retrieve'), [str(this.id + '_args')], []))], [])], [], this.sourceLoc));
+      [star(call(dot(id('R'), 'retrieve'), [str(this.id + '_args')], []))], [])], [], this.sourceLoc, this.id));
 
       state.parents.pop();
   return sub(tuple(elts), index(n(3)));
 }
 
 Keyword.prototype.instrumented = function(state) {
-  return new Keyword(this.sourceLoc, this.arg, this.value.instrumented(state));
+  return new Keyword(this.sourceLoc, this.id, this.arg, this.value.instrumented(state));
 };
 
 IfExp.prototype.instrumented = function(state) {
@@ -131,12 +130,12 @@ IfExp.prototype.instrumented = function(state) {
   state.parents.push(this);
 
   state.parents.pop();
-  return new IfExp(this.sourceLoc, 
+  return new IfExp(this.sourceLoc, this.id,  
     this.test.instrumented(state), this.body.instrumented(state), this.orelse.instrumented(state));
 };
 
 Attribute.prototype.instrumented = function(state) {
-  return new Attribute(this.sourceLoc, this.value.instrumented(state), this.attr, this.ctx);
+  return new Attribute(this.sourceLoc, this.id, this.value.instrumented(state), this.attr, this.ctx);
 };
 
 // Subscripting
@@ -168,14 +167,14 @@ AugAssign.prototype.instrumented = function(state) {
   switch (this.target.constructor.name) {
     case 'Name':
       // target = R.assignVar(..., target.toString(), target op value)
-      augValue = new BinOp(null, this.target, this.op.slice(0, -1), this.value.instrumented(state));
+      augValue = new BinOp(null, null, this.target, this.op.slice(0, -1), this.value.instrumented(state));
       return assign(this.target, call(dot(id('R'), 'assignVar'), [
         n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), id('__declEnv__'),
         str(this.target.toString()), augValue
       ]));
     case 'Attribute':
       // TODO
-      augValue = new BinOp(null, 
+      augValue = new BinOp(null, null, 
         dot(call(dot(id('R'), 'retrieve'), [str(`${this.target.id}_obj`)]), this.target.attr), this.op.slice(0, -1), 
         this.value.instrumented(state));
       return [
@@ -204,11 +203,15 @@ AugAssign.prototype.instrumented = function(state) {
   return ans;
 };
 
+Pass.prototype.instrumented = function(state) {
+  return this;
+}
+
 ExprStmt.prototype.instrumented = function(state) {
   const parent = state.parent;
   state.parents.push(this);
 
-  const ans = new ExprStmt(this.sourceLoc, this.expr.instrumented(state));
+  const ans = new ExprStmt(this.sourceLoc, this.id, this.expr.instrumented(state));
   state.parents.pop();
   return ans;
 };
@@ -241,7 +244,7 @@ If.prototype.instrumented = function(state) {
   });
   const newOrElse = this.orelse === null ? null : flatten(this.orelse.map(stmt => stmt.instrumented(state)));
   state.parents.pop();
-  return new If(this.sourceLoc, newTests, newBodies, newOrElse);
+  return new If(this.sourceLoc, this.id, newTests, newBodies, newOrElse);
 }
 
 For.prototype.instrumented = function(state) {
@@ -259,10 +262,18 @@ For.prototype.instrumented = function(state) {
   ], [])));
   // __env_<id>__ = __currentEnv__
   ans.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));
+
+  const instrumentedForBody = [];
+  instrumentedForBody.push(
+    assign(this.target, this.target, this.target.sourceLoc, this.target.id)
+      .instrumented(state)
+  );
+  instrumentedForBody.push(...this.body.map(stmt => stmt.instrumented(state)));
+
   // instrumented for loop
   ans.push(for_(this.target.instrumented(state), call(dot(id('R'), 'retrieve'), [str(`${this.id}_iter`)]), 
-    flatten(this.body.map(stmt => stmt.instrumented(state))), 
-    this.orelse ? flatten(this.orelse.map(stmt => stmt.instrumented(state))) : null, this.sourceLoc));
+    flatten(instrumentedForBody), 
+    this.orelse ? flatten(this.orelse.map(stmt => stmt.instrumented(state))) : null, this.sourceLoc, this.id));
   // R.leaveScope(__currentEnv__)
   ans.push(exprS(call(dot(id('R'), 'leaveScope'), [id('__currentEnv__')], [])));
   // __currentEnv__ = __env_<prevEnvId>__
@@ -286,7 +297,7 @@ While.prototype.instrumented = function(state) {
   // instrumented while loop
   ans.push(while_(this.test.instrumented(state), 
     flatten(this.body.map(stmt => stmt.instrumented(state))),
-    this.orelse ? flatten(this.orelse.map(stmt => stmt.instrumented(state))) : null, this.sourceLoc
+    this.orelse ? flatten(this.orelse.map(stmt => stmt.instrumented(state))) : null, this.sourceLoc, this.id
   ));
   // R.leaveScope(__currentEnv__)
   ans.push(exprS(call(dot(id('R'), 'leaveScope'), [id('__currentEnv__')], [])));
@@ -324,7 +335,7 @@ FunctionDef.prototype.instrumented = function(state) {
   state.popExecutionOrderCounter();
   state.parents.pop();
   return [
-    def(this.name, this.args, body, this.decoratorList, this.returns, this.sourceLoc),
+    def(this.name, this.args, body, this.decoratorList, this.returns, this.sourceLoc, this.id),
     exprS(call(dot(id('R'), 'parentEnv'), [id(this.name), id('__currentEnv__')]))
   ];
 };
@@ -376,7 +387,7 @@ ClassDef.prototype.instrumented = function(state) {
   // __declEnv__ = __currentEnv__
   ans.push(assign(id(`__declEnv__`), id('__currentEnv__')));
   // classDef
-  ans.push(clsDef(this.name, this.bases, this.keywords, body, this.decoratorList, this.sourceLoc));
+  ans.push(clsDef(this.name, this.bases, this.keywords, body, this.decoratorList, this.sourceLoc, this.id));
   // R.leaveScope(__currentEnv__)
   ans.push(exprS(call(dot(id('R'), 'leaveScope'), [id('__currentEnv__')])))
   // __currentEnv__ = __env_<prevEnvId>__
@@ -392,7 +403,7 @@ Lambda.prototype.instrumented = function(state) {
   state.parents.push(this);
 
   const lambdaId = state.lambdaId++;
-  const fn = def(`__lambda_${lambdaId}__`, this.args, [ret(this.body, this.body.sourceLoc)], [], null, this.sourceLoc);
+  const fn = def(`__lambda_${lambdaId}__`, this.args, [ret(this.body, this.body.sourceLoc)], [], null, this.sourceLoc, this.id);
   state.lambdas.push(fn);
   state.parents.pop();
   return id(`__lambda_${lambdaId}__`);
@@ -403,11 +414,12 @@ Return.prototype.instrumented = function(state) {
   state.parents.push(this);
   
   // return R.localReturn(..., __currentEnv__, value)
+  const instrumentedValue = this.value.instrumented(state);
   state.parents.pop();
   return ret(call(dot(id('R'), 'localReturn'), [
     n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'),
-    this.value.instrumented(state)
-  ]), this.sourceLoc);
+    instrumentedValue
+  ]), this.sourceLoc, this.id);
 }
 
 Arguments.prototype.instrumented = function(state) {
