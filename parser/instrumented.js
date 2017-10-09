@@ -256,19 +256,35 @@ For.prototype.instrumented = function(state) {
 
   // R.memoize(<id>_iter, iter)
   ans.push(exprS(call(dot(id('R'), 'memoize'), [str(`${this.id}_iter`), this.iter.instrumented(state)])));
-  // __currentEnv__ = R.enterScope(..., __currentEnv__)
+  // __currentEnv__ = R.enterScope(..., __currentEnv__, this.id)
   ans.push(assign([id('__currentEnv__')], call(dot(id('R'), 'enterScope'), [
-    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__')
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), n(this.id)
   ], [])));
-  // __env_<id>__ = __currentEnv__
-  ans.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));
+  // __env_<id>_loop__ = __currentEnv__
+  ans.push(assign(id(`__env_${this.id}_loop__`), id('__currentEnv__')));
+  // TODO
+  // __iteration_<id>__ = 0
+  ans.push(assign(id(`__iteration_${this.id}__`), n(0)))
 
   const instrumentedForBody = [];
+  // __currentEnv__ = R.enterScope(..., __currentEnv__, __iteration_id__)
+  instrumentedForBody.push(assign(id('__currentEnv__'), call(dot(id('R'), 'enterScope'), [
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), id(`__iteration_${this.id}__`)
+  ], [])));
+  // __env_<id>__ = __currentEnv__
+  instrumentedForBody.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));
+  // <target> = <target>
   instrumentedForBody.push(
     assign(this.target, this.target, this.target.sourceLoc, this.target.id)
       .instrumented(state)
   );
   instrumentedForBody.push(...this.body.map(stmt => stmt.instrumented(state)));
+  // R.leaveScope(__currentEnv__)
+  instrumentedForBody.push(exprS(call(dot(id('R'), 'leaveScope'), [id('__currentEnv__')], [])));
+  // __currentEnv__ = __env_<id>_loop__
+  instrumentedForBody.push(assign([id('__currentEnv__')], id(`__env_${this.id}_loop__`)));
+  // __iteration_<id>__ = __iteration_<id>__ + 1
+  instrumentedForBody.push(assign(id(`__iteration_${this.id}__`), plus(id(`__iteration_${this.id}__`), n(1))));
 
   // instrumented for loop
   ans.push(for_(this.target.instrumented(state), call(dot(id('R'), 'retrieve'), [str(`${this.id}_iter`)]), 

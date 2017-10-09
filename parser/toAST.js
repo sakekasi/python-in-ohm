@@ -501,16 +501,14 @@ semantics.addOperation('toAST(sourceMap, idContext)', {
       value, slice);
   },
 
-  PrimaryExpr_call(funcCst, _oparen, optArgsOrComp, __) {
+  PrimaryExpr_call(funcCst, _oparen, optArgsOrComp, _cparen) {
     const sourceMap = this.args.sourceMap;
     const idContext = this.args.idContext;
     const func = funcCst.toAST(sourceMap, idContext);
     const argsOrComp = optArgsOrComp.toAST(sourceMap, idContext);
     if (argsOrComp.length === 0 || argsOrComp[0] instanceof Comprehension) { // TODO: comprehension
-      console.log(_oparen);
       return new Call(this.sourceLoc(sourceMap), _oparen.id(idContext), func, argsOrComp, []);
     } else {
-      console.log(_oparen);
       const args = argsOrComp[0];
       return new Call(this.sourceLoc(sourceMap), _oparen.id(idContext), func, args.positional, args.keyword);
     }

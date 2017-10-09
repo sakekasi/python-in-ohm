@@ -100,10 +100,14 @@ class TokenStream {
     diffOps.forEach(item => {
       if (this.tokens.includes(item.atom)) {
         item.from = 'this';
+        item.this = item.atom;
+        item.other = other.tokens.find(t => item.atom.equals(t));
       } else {
         item.from = 'other';
+        item.this = this.tokens.find(t => item.atom.equals(t));
+        item.other = item.atom;
       }
-    })
+    });
     // cluster into add + delete
     const diffObjs = [];
     let currentDiffObj = null;
@@ -123,7 +127,7 @@ class TokenStream {
       case 'none':
         if (currentDiffObj !== null) {
           // a none after a diff means we close the current diff obj
-          currentDiffObj.to = op.atom.newStartIdx;
+          currentDiffObj.to = op.this.newStartIdx;
 
           // get string value from other
           let startToken = currentAdds.reduce((agg, b) => agg && agg.tokenIdx < b.tokenIdx ? agg : b, null);
@@ -153,7 +157,7 @@ class TokenStream {
           currentDiffObj = null;
           currentAdds = [];
         }
-        lastUnchangedToken = op.atom;
+        lastUnchangedToken = op.this;
         break;
       }
     });

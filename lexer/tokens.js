@@ -219,6 +219,9 @@ class EOF extends Token{
       ans.push(new Dedent(state.indentationStack.join('').length, state.origIdx, state.origIdx));
       state.indentationStack.pop();
     }
+    if (state.parenStack.length > 0) {
+      throw new ParensError(state.origIdx, `^\nUnmatched parentheses`);
+    }
     return ans;
   }
 }

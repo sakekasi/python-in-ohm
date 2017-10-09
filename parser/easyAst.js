@@ -161,3 +161,7 @@ function args(positional, vararg = null, kwonly = [], kw = null, defaults = null
 function clsDef(name, bases, keywords, body, decoratorList = [], sourceLoc = null, id = null) {
   return new ClassDef(sourceLoc, id, name, bases, keywords, body, decoratorList);
 }
+
+function plus(a, b, sourceLoc = null, id = null) {
+  return new BinOp(sourceLoc, id, a, '+', b);
+}

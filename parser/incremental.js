@@ -61,6 +61,7 @@ class IncrementalInstrumenter {
       console.log('existing cst node');
       return this.cstNodeIds.get(cstNode);
     } else {
+      console.log('new cst node', cstNode);
       const id = this.nextCstNodeId++;
       this.cstNodeIds.set(cstNode, id);
       return id;
