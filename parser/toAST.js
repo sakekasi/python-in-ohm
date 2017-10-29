@@ -588,6 +588,17 @@ semantics.addOperation('toAST(sourceMap, idContext)', {
   // TODO: YieldExpr
   // TODO: YieldArg
 
+  SliceList(sliceCsts) {
+    const sourceMap = this.args.sourceMap;
+    const idContext = this.args.idContext;
+    const slices = sliceCsts.toAST(sourceMap, idContext);
+    if (slices.length > 1) {
+      return new ExtSlice(this.sourceLoc(sourceMap), this.id(idContext), slices);
+    } else {
+      return slices[0];
+    }
+  },
+
   Slice_single(exprCst) {
     const sourceMap = this.args.sourceMap;
     const idContext = this.args.idContext;

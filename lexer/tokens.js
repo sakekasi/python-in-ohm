@@ -34,7 +34,7 @@ class Operator extends Token {
     return new Operator(op, ...state.getRange(op));
   }
 }
-Operator.regex = /\+|-|\*\*|\*|\/\/|\/|%|@|<<|>>|&|\||\^|~|<|>|<=|>=|==|!=/u
+Operator.regex = /\+|-|\*\*|\*|\/\/|\/|%|@|<<|>>|&|\||\^|~|<=|>=|==|!=|<|>/u
 
 class LiteralT extends Token {}
 

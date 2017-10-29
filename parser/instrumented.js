@@ -141,6 +141,25 @@ Attribute.prototype.instrumented = function(state) {
 // Subscripting
 // ----------
 
+Subscript.prototype.instrumented = function(state) {
+  return new Subscript(
+    this.sourceLoc, this.id, 
+    this.value.instrumented(state), this.slice.instrumented(state), 
+    this.ctx);
+};
+
+Index.prototype.instrumented = function(state) {
+  return new Index(this.sourceLoc, this.id, this.value.instrumented(state));
+};
+
+Slice.prototype.instrumented = function(state) {
+  return new Slice(this.sourceLoc, this.id,
+    this.lower === null ? null : this.lower.instrumented(state),
+    this.upper === null ? null : this.upper.instrumented(state),
+    this.step === null ? null : this.step.instrumented(state)
+  );
+};
+
 // Comprehensions
 // ------------
 
@@ -304,15 +323,35 @@ While.prototype.instrumented = function(state) {
 
   const ans = [];
   const prevEnvId = parent.id;
-  // __currentEnv__ = R.enterScope(..., __currentEnv__)
+  // __currentEnv__ = R.enterScope(..., __currentEnv__, this.id)
   ans.push(assign([id('__currentEnv__')], call(dot(id('R'), 'enterScope'), [
-    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__')
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), n(this.id)
+  ], [])));
+  // __env_<id>_loop__ = __currentEnv__
+  ans.push(assign(id(`__env_${this.id}_loop__`), id('__currentEnv__')));
+  // __iteration_<id>__ = 0
+  ans.push(assign(id(`__iteration_${this.id}__`), n(0)))
+
+  const instrumentedWhileBody = [];
+  // __currentEnv__ = R.enterScope(..., __currentEnv__, __iteration_<id>__)
+  instrumentedWhileBody.push(assign(id('__currentEnv__'), call(dot(id('R'), 'enterScope'), [
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), id(`__iteration_${this.id}__`)
   ], [])));
   // __env_<id>__ = __currentEnv__
-  ans.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));
+  instrumentedWhileBody.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));
+  // instrumented while body
+  instrumentedWhileBody.push(...flatten(this.body.map(stmt => stmt.instrumented(state))));
+  
+  // R.leaveScope(__currentEnv__)
+  instrumentedWhileBody.push(exprS(call(dot(id('R'), 'leaveScope'), [id('__currentEnv__')], [])));
+  // __currentEnv__ = __env_<id>_loop__
+  instrumentedWhileBody.push(assign([id('__currentEnv__')], id(`__env_${this.id}_loop__`)));
+  // __iteration_<id>__ = __iteration_<id>__ + 1
+  instrumentedWhileBody.push(assign(id(`__iteration_${this.id}__`), plus(id(`__iteration_${this.id}__`), n(1))));
+
   // instrumented while loop
   ans.push(while_(this.test.instrumented(state), 
-    flatten(this.body.map(stmt => stmt.instrumented(state))),
+    instrumentedWhileBody,
     this.orelse ? flatten(this.orelse.map(stmt => stmt.instrumented(state))) : null, this.sourceLoc, this.id
   ));
   // R.leaveScope(__currentEnv__)
@@ -396,7 +435,7 @@ ClassDef.prototype.instrumented = function(state) {
   // __currentEnv__ = R.enterScope(...)
   // TODO: fix ordering
   ans.push(assign(id('__currentEnv__'), call(dot(id('R'), 'enterScope'), [
-    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__')
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'), n(this.id)
   ])));
   // __env_<id>__ = __currentEnv__
   ans.push(assign(id(`__env_${this.id}__`), id('__currentEnv__')));

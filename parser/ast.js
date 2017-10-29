@@ -392,6 +392,7 @@ class Subscript extends Expr {
     super(sourceLoc, id);
     this.value = value;
     this.slice = slice;
+    if (!(this.slice instanceof Index || this.slice instanceof Slice)) debugger;
     this.ctx = ctx;
   }
 
@@ -429,6 +430,22 @@ class Slice extends AST {
 
   get children() {
     return [this.lower, this.upper, this.step];
+  }
+
+  toString() {
+    let ans = '';
+    if (this.lower !== null) {
+      ans += this.lower.toString();
+    }
+    ans += ':';
+    if (this.upper !== null) {
+      ans += this.upper.toString();
+    }
+    if (this.step !== null) {
+      ans += ':';
+      ans += this.step.toString();
+    }
+    return ans;
   }
 }
 

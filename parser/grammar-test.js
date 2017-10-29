@@ -1,6 +1,13 @@
 const tests = {
   Program: [
     {
+      name: 'less than or equal',
+      code: `a = 5
+b = a <= 5
+`,
+      succeed: true
+    },
+    {
       name: 'point',
       unpreprocessed: `class Point(object):
   def __init__(self, x, y):
@@ -60,6 +67,11 @@ after = p`,
   ],
 
   'SimpleStmt_assign': [
+    {
+      name: 'test = x <= 3',
+      code: 'test = x <= 3',
+      succeed: true
+    },
     {
       name: `hello = goodbye = yield 42`,
       code: `hello = goodbye = yield 42`,
@@ -973,6 +985,14 @@ def __new__(a, b, c):
       code: '42',
       succeed: false
     },
+  ],
+
+  'Expr': [
+    {
+      name: 'x <= 3',
+      code: 'x <= 3',
+      succeed: true
+    }
   ],
   
   'Expr_lambda': [
