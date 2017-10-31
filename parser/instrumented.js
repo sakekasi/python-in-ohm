@@ -72,6 +72,9 @@ Name.prototype.instrumented = function(state) {
 // Expressions
 // ---------
 
+UnaryOp.prototype.instrumented = function(state) {
+  return new UnaryOp(this.sourceLoc, this.id, this.op, this.expr.instrumented(state));
+}
 
 BinOp.prototype.instrumented = function(state) {
   const parent = state.parent;
@@ -80,6 +83,8 @@ BinOp.prototype.instrumented = function(state) {
   state.parents.pop();
   return new BinOp(this.sourceLoc, this.id, this.left.instrumented(state), this.op, this.right.instrumented(state));
 };
+
+// TODO: BoolOp
 
 Compare.prototype.instrumented = function(state) {
   const parent = state.parent;
@@ -160,8 +165,16 @@ Slice.prototype.instrumented = function(state) {
   );
 };
 
+// TODO: ExtSlice
+
 // Comprehensions
 // ------------
+
+// TODO: ListComp
+// TODO: SetComp
+// TODO: DictComp
+// TODO: GeneratorExp
+// TODO: Comprehension
 
 // Statements
 // ---------
@@ -176,6 +189,8 @@ Assign.prototype.instrumented = function(state) {
   state.parents.pop();
   return ans;
 }
+
+// TODO: AnnAssign
 
 // with AugTargets, no destructuring is necessary
 AugAssign.prototype.instrumented = function(state) {
@@ -222,6 +237,10 @@ AugAssign.prototype.instrumented = function(state) {
   return ans;
 };
 
+// TODO: Raise
+// TODO: Assert
+// TODO: Delete
+
 Pass.prototype.instrumented = function(state) {
   return this;
 }
@@ -235,8 +254,12 @@ ExprStmt.prototype.instrumented = function(state) {
   return ans;
 };
 
+// TODO: ExprStmt
+
 // Imports
 // ------
+
+// TODO: Import
 
 ImportFrom.prototype.instrumented = function(state) {
   const parent = state.parent;
@@ -246,6 +269,8 @@ ImportFrom.prototype.instrumented = function(state) {
   state.parents.pop();
   return this;
 };
+
+// TODO: Alias
 
 // Control Flow
 // ----------
@@ -362,6 +387,11 @@ While.prototype.instrumented = function(state) {
   return ans;
 }
 
+// TODO: Break
+// TODO: Continue
+// TODO: ExceptHandler
+// TODO: WithItem
+
 // Function and Class Definitions
 // -----------------------
 
@@ -394,6 +424,56 @@ FunctionDef.prototype.instrumented = function(state) {
     exprS(call(dot(id('R'), 'parentEnv'), [id(this.name), id('__currentEnv__')]))
   ];
 };
+
+Lambda.prototype.instrumented = function(state) {
+  const parent = state.parent;
+  state.parents.push(this);
+
+  const lambdaId = state.lambdaId++;
+  const fn = def(`__lambda_${lambdaId}__`, this.args, [ret(this.body, this.body.sourceLoc)], [], null, this.sourceLoc, this.id);
+  state.lambdas.push(fn);
+  state.parents.pop();
+  return id(`__lambda_${lambdaId}__`);
+};
+
+Arguments.prototype.instrumented = function(state) {
+  const parent = state.parent;
+  state.parents.push(this);
+
+  const stmts = [];
+  const execCounter = last(state.executionOrderCounters);
+  this.args.forEach(arg => {
+    // R.assignVar(..., __currentEnv__, __declEnv__, argname, arg);
+    stmts.push(exprS(call(dot(id('R'), 'assignVar'), [
+      n(state.nextOrderNum()), arg.sourceLoc.toAST() /*TODO: full param source*/,
+      id('__currentEnv__'), id('__declEnv__'), str(arg.toString()), arg
+    ])));
+  });
+  if (this.vararg !== null) {
+    // R.assignVar(..., varargname, vararg)
+    throw new Error('TODO: varargs');
+  }
+  state.parents.pop();
+  return stmts;
+};
+
+Return.prototype.instrumented = function(state) {
+  const parent = state.parent;
+  state.parents.push(this);
+  
+  // return R.localReturn(..., __currentEnv__, value)
+  const instrumentedValue = this.value.instrumented(state);
+  state.parents.pop();
+  return ret(call(dot(id('R'), 'localReturn'), [
+    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'),
+    instrumentedValue
+  ]), this.sourceLoc, this.id);
+};
+
+// TODO: Yield
+// TODO: YieldFrom
+// TODO: Global
+// TODO: Nonlocal
 
 ClassDef.prototype.instrumented = function(state) {
   console.assert(!this.body.some(stmt => stmt instanceof FunctionDef && stmt.name === '__new__'));
@@ -453,50 +533,8 @@ ClassDef.prototype.instrumented = function(state) {
   return ans;
 };
 
-Lambda.prototype.instrumented = function(state) {
-  const parent = state.parent;
-  state.parents.push(this);
-
-  const lambdaId = state.lambdaId++;
-  const fn = def(`__lambda_${lambdaId}__`, this.args, [ret(this.body, this.body.sourceLoc)], [], null, this.sourceLoc, this.id);
-  state.lambdas.push(fn);
-  state.parents.pop();
-  return id(`__lambda_${lambdaId}__`);
-};
-
-Return.prototype.instrumented = function(state) {
-  const parent = state.parent;
-  state.parents.push(this);
-  
-  // return R.localReturn(..., __currentEnv__, value)
-  const instrumentedValue = this.value.instrumented(state);
-  state.parents.pop();
-  return ret(call(dot(id('R'), 'localReturn'), [
-    n(state.nextOrderNum()), this.sourceLoc.toAST(), id('__currentEnv__'),
-    instrumentedValue
-  ]), this.sourceLoc, this.id);
-}
-
-Arguments.prototype.instrumented = function(state) {
-  const parent = state.parent;
-  state.parents.push(this);
-
-  const stmts = [];
-  const execCounter = last(state.executionOrderCounters);
-  this.args.forEach(arg => {
-    // R.assignVar(..., __currentEnv__, __declEnv__, argname, arg);
-    stmts.push(exprS(call(dot(id('R'), 'assignVar'), [
-      n(state.nextOrderNum()), arg.sourceLoc.toAST() /*TODO: full param source*/,
-      id('__currentEnv__'), id('__declEnv__'), str(arg.toString()), arg
-    ])));
-  });
-  if (this.vararg !== null) {
-    // R.assignVar(..., varargname, vararg)
-    throw new Error('TODO: varargs');
-  }
-  state.parents.pop();
-  return stmts;
-};
+// Async and Await
+// --------------
 
 // -------------
 // -------------

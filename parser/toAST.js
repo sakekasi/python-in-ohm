@@ -131,7 +131,7 @@ semantics.addOperation('toAST(sourceMap, idContext)', {
     const orelse = optElseBodyCst.numChildren === 1 ? flattenAndFilterNulls(optElseBodyCst.toAST(sourceMap, idContext)[0]) : null;
 
     return new If(this.sourceLoc(sourceMap), _if.id(idContext),
-      [test].concat(...elifTests), [body].concat(...elifBodies), orelse);
+      [test].concat(...elifTests), [body].concat(elifBodies), orelse);
   },
 
   CompoundStmt_while(_while, testCst, bodyCst, __, optElseCst) {
@@ -465,7 +465,7 @@ semantics.addOperation('toAST(sourceMap, idContext)', {
     const idContext = this.args.idContext;
     let op = opCst.toAST(sourceMap, idContext); // TODO
     let expr = exprCst.toAST(sourceMap, idContext);
-    return new UnaryOp(this.sourceLoc(sourceMap), opCst.id(idContext), op, exprCst);
+    return new UnaryOp(this.sourceLoc(sourceMap), opCst.id(idContext), op, expr);
   },
 
   Power(leftCst, _op, optRightCst) { // ** (right associative)

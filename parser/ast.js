@@ -252,6 +252,10 @@ class UnaryOp extends Expr {
   get children() {
     return [this.expr];
   }
+
+  toString() {
+    return this.op + '(' + this.expr.toString() + ')';
+  }
 }
 
 class BinOp extends Expr {
@@ -721,8 +725,8 @@ class If extends Stmt {
     let ans = '';
     ans += i + 'if ' + test.toString() + ' :\n';
     ans += body.map(stmt => stmt.toString(indentation + 2)).join('');
-    elifTests.forEach((elifTest, i) => {
-      const elifBody = elifBodies[i];
+    elifTests.forEach((elifTest, j) => {
+      const elifBody = elifBodies[j];
       ans += i + 'elif ' + elifTest.toString() + ' :\n';
       ans += elifBody.map(stmt => stmt.toString(indentation + 2)).join('');
     });
